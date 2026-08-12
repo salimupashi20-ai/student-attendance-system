@@ -129,6 +129,103 @@ const createSession = async (req, res) => {
     }
 };
 
+const getMySessions = (req, res) => {
+    const lecturerId = req.user.id;
+
+    const query = `
+        SELECT
+            lecture_sessions.id,
+            lecture_sessions.course_id,
+            courses.course_code,
+            courses.course_name,
+            lecture_sessions.session_date,
+            lecture_sessions.start_time,
+            lecture_sessions.end_time,
+            lecture_sessions.qr_expires_at,
+            lecture_sessions.allowed_radius,
+            lecture_sessions.is_active,
+            lecture_sessions.created_at
+        FROM lecture_sessions
+        INNER JOIN courses
+            ON lecture_sessions.course_id = courses.id
+        WHERE lecture_sessions.created_by = ?
+        ORDER BY lecture_sessions.created_at DESC
+    `;
+
+    db.query(query, [lecturerId], (err, results) => {
+        if (err) {
+            return res.status(500).json({
+                error: err.message
+            });
+        }
+
+        res.status(200).json({
+            message: "Lecture sessions retrieved successfully.",
+            sessions: results
+        });
+    });
+};
+
+const closeSession = (req, res) => {
+    const sessionId = req.params.sessionId;
+    const lecturerId = req.user.id;
+
+    const checkQuery = `
+        SELECT *
+        FROM lecture_sessions
+        WHERE id = ?
+        AND created_by = ?
+    `;
+
+    db.query(
+        checkQuery,
+        [sessionId, lecturerId],
+        (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    error: err.message
+                });
+            }
+
+            if (results.length === 0) {
+                return res.status(404).json({
+                    message: "Session not found or you are not authorized to manage it."
+                });
+            }
+
+            if (!results[0].is_active) {
+                return res.status(400).json({
+                    message: "Session is already closed."
+                });
+            }
+
+            const updateQuery = `
+                UPDATE lecture_sessions
+                SET is_active = 0
+                WHERE id = ?
+            `;
+
+            db.query(
+                updateQuery,
+                [sessionId],
+                (err) => {
+                    if (err) {
+                        return res.status(500).json({
+                            error: err.message
+                        });
+                    }
+
+                    res.status(200).json({
+                        message: "Attendance session closed successfully."
+                    });
+                }
+            );
+        }
+    );
+};
+
 module.exports = {
-    createSession
+    createSession,
+    getMySessions,
+    closeSession
 };
