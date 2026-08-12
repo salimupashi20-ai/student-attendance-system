@@ -10,6 +10,7 @@ require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const courseRoutes = require("./routes/courseRoutes");
 const enrollmentRoutes = require("./routes/enrollmentRoutes");
+const sessionRoutes = require("./routes/sessionRoutes");
 
 // Initialize Express
 const app = express();
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
+app.use("/api/sessions", sessionRoutes);
 
 // Test route
 app.get("/", (req, res) => {
