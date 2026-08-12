@@ -6,7 +6,16 @@ const {
     loginUser
 } = require("../controllers/authController");
 
+const protect = require("../middleware/authMiddleware");
+
 router.post("/register", registerUser);
 router.post("/login", loginUser);
+
+router.get("/profile", protect, (req, res) => {
+    res.status(200).json({
+        message: "Protected route accessed successfully",
+        user: req.user
+    });
+});
 
 module.exports = router;
