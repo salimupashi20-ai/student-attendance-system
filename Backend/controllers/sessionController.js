@@ -29,8 +29,10 @@ const createSession = async (req, res) => {
 
         // Confirm lecturer owns the course
         const courseQuery = `
-            SELECT * FROM courses
-            WHERE id = ? AND lecturer_id = ?
+            SELECT *
+            FROM courses
+            WHERE id = ?
+            AND lecturer_id = ?
         `;
 
         db.query(
@@ -49,10 +51,12 @@ const createSession = async (req, res) => {
                     });
                 }
 
-                // Generate secure unique token
-                const qrToken = crypto.randomBytes(32).toString("hex");
+                // Generate secure QR token
+                const qrToken = crypto
+                    .randomBytes(32)
+                    .toString("hex");
 
-                // QR expires 15 minutes from now
+                // QR expires 15 minutes after creation
                 const expiryDate = new Date(
                     Date.now() + 15 * 60 * 1000
                 );
@@ -84,8 +88,8 @@ const createSession = async (req, res) => {
                         end_time,
                         qrToken,
                         expiryDate,
-                        lecturer_latitude || null,
-                        lecturer_longitude || null,
+                        lecturer_latitude ?? null,
+                        lecturer_longitude ?? null,
                         50,
                         true,
                         lecturerId
@@ -97,33 +101,39 @@ const createSession = async (req, res) => {
                             });
                         }
 
-                        const sessionId = result.insertId;
+                        try {
+                            const sessionId = result.insertId;
 
-                        // This is the content encoded in the QR
-                        const qrPayload = JSON.stringify({
-                            session_id: sessionId,
-                            token: qrToken
-                        });
+                            // QR opens the student scan page
+                            const qrPayload =
+                                `${process.env.FRONTEND_URL}/student/scan?session_id=${sessionId}&token=${qrToken}`;
 
-                        const qrCode = await QRCode.toDataURL(qrPayload);
+                            const qrCode =
+                                await QRCode.toDataURL(qrPayload);
 
-                        res.status(201).json({
-                            message: "Lecture session created successfully",
-                            session: {
-                                id: sessionId,
-                                course_id,
-                                qr_expires_at: expiryDate,
-                                allowed_radius: 50
-                            },
-                            qr_code: qrCode
-                        });
+                            return res.status(201).json({
+                                message: "Lecture session created successfully",
+                                session: {
+                                    id: sessionId,
+                                    course_id,
+                                    qr_expires_at: expiryDate,
+                                    allowed_radius: 50
+                                },
+                                qr_code: qrCode
+                            });
+                        } catch (qrError) {
+                            return res.status(500).json({
+                                message: "Session created, but QR generation failed.",
+                                error: qrError.message
+                            });
+                        }
                     }
                 );
             }
         );
 
     } catch (error) {
-        res.status(500).json({
+        return res.status(500).json({
             error: error.message
         });
     }
@@ -159,7 +169,7 @@ const getMySessions = (req, res) => {
             });
         }
 
-        res.status(200).json({
+        return res.status(200).json({
             message: "Lecture sessions retrieved successfully.",
             sessions: results
         });
@@ -215,7 +225,7 @@ const closeSession = (req, res) => {
                         });
                     }
 
-                    res.status(200).json({
+                    return res.status(200).json({
                         message: "Attendance session closed successfully."
                     });
                 }
