@@ -1,4 +1,5 @@
 const express = require("express");
+
 const router = express.Router();
 
 const {
@@ -6,19 +7,28 @@ const {
     getSessionAttendance,
     getAttendanceSummary,
     getMyAttendanceHistory,
+    getMyAttendanceSummary,
     getCourseAttendanceStats
 } = require("../controllers/attendanceController");
 
-const protect = require("../middleware/authMiddleware");
-const authorizeRoles = require("../middleware/roleMiddleware");
+const protect =
+    require("../middleware/authMiddleware");
 
-// Student scans QR
+const authorizeRoles =
+    require("../middleware/roleMiddleware");
+
+
+// =====================================
+// STUDENT ROUTES
+// =====================================
+
 router.post(
     "/scan",
     protect,
     authorizeRoles("student"),
     scanQRCode
 );
+
 router.get(
     "/my-history",
     protect,
@@ -26,7 +36,18 @@ router.get(
     getMyAttendanceHistory
 );
 
-// Lecturer views attendance records for a session
+router.get(
+    "/my-summary",
+    protect,
+    authorizeRoles("student"),
+    getMyAttendanceSummary
+);
+
+
+// =====================================
+// LECTURER ROUTES
+// =====================================
+
 router.get(
     "/session/:sessionId",
     protect,
@@ -34,18 +55,19 @@ router.get(
     getSessionAttendance
 );
 
-// Lecturer views attendance summary for a session
 router.get(
     "/session/:sessionId/summary",
     protect,
     authorizeRoles("lecturer"),
     getAttendanceSummary
 );
+
 router.get(
     "/course/:courseId/stats",
     protect,
     authorizeRoles("lecturer"),
     getCourseAttendanceStats
 );
+
 
 module.exports = router;

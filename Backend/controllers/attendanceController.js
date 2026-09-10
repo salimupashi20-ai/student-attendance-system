@@ -436,7 +436,117 @@ const getMyAttendanceHistory = (req, res) => {
         });
     });
 };
+// =====================================
+// STUDENT: TRUE ATTENDANCE SUMMARY
+// =====================================
 
+const getMyAttendanceSummary = (req, res) => {
+    const studentId = req.user.id;
+
+    /*
+        Count every completed/closed lecture session for
+        courses the student is enrolled in.
+
+        A session counts if:
+        - it was created after the student enrolled
+        - AND it has been closed OR its scheduled end time has passed
+
+        Then check whether the student has a "present"
+        attendance record for that session.
+    */
+
+    const query = `
+        SELECT
+            COUNT(DISTINCT lecture_sessions.id) AS total_sessions,
+
+            COUNT(
+                DISTINCT CASE
+                    WHEN attendance.id IS NOT NULL
+                    THEN lecture_sessions.id
+                END
+            ) AS total_present
+
+        FROM course_enrollments
+
+        INNER JOIN lecture_sessions
+            ON course_enrollments.course_id =
+               lecture_sessions.course_id
+
+            AND TIMESTAMP(
+                lecture_sessions.session_date,
+                lecture_sessions.start_time
+            ) >= course_enrollments.enrolled_at
+
+        LEFT JOIN attendance
+            ON attendance.session_id =
+               lecture_sessions.id
+
+            AND attendance.student_id = ?
+
+            AND attendance.status = 'present'
+
+        WHERE course_enrollments.student_id = ?
+
+        AND (
+            lecture_sessions.is_active = 0
+
+            OR TIMESTAMP(
+                lecture_sessions.session_date,
+                lecture_sessions.end_time
+            ) <= NOW()
+        )
+    `;
+
+    db.query(
+        query,
+        [studentId, studentId],
+        (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    error: err.message
+                });
+            }
+
+            const totalSessions =
+                Number(results[0].total_sessions) || 0;
+
+            const totalPresent =
+                Number(results[0].total_present) || 0;
+
+            const totalAbsent =
+                Math.max(
+                    totalSessions - totalPresent,
+                    0
+                );
+
+            const attendancePercentage =
+                totalSessions === 0
+                    ? 0
+                    : Number(
+                        (
+                            (
+                                totalPresent /
+                                totalSessions
+                            ) *
+                            100
+                        ).toFixed(2)
+                    );
+
+            return res.status(200).json({
+                message:
+                    "Student attendance summary retrieved successfully.",
+
+                summary: {
+                    total_sessions: totalSessions,
+                    total_present: totalPresent,
+                    total_absent: totalAbsent,
+                    attendance_percentage:
+                        attendancePercentage
+                }
+            });
+        }
+    );
+};
 const getCourseAttendanceStats = (req, res) => {
     const courseId = req.params.courseId;
     const lecturerId = req.user.id;
@@ -651,5 +761,6 @@ module.exports = {
     getSessionAttendance,
     getAttendanceSummary,
     getMyAttendanceHistory,
+    getMyAttendanceSummary,
     getCourseAttendanceStats
 };

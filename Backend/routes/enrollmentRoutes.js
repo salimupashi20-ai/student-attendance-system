@@ -1,13 +1,35 @@
 const express = require("express");
+
 const router = express.Router();
 
 const {
     enrollStudent,
-    getCourseStudents
+    getCourseStudents,
+    getMyCourses
 } = require("../controllers/enrollmentController");
 
-const protect = require("../middleware/authMiddleware");
-const authorizeRoles = require("../middleware/roleMiddleware");
+const protect =
+    require("../middleware/authMiddleware");
+
+const authorizeRoles =
+    require("../middleware/roleMiddleware");
+
+
+// =====================================
+// STUDENT
+// =====================================
+
+router.get(
+    "/my-courses",
+    protect,
+    authorizeRoles("student"),
+    getMyCourses
+);
+
+
+// =====================================
+// LECTURER
+// =====================================
 
 router.post(
     "/",
@@ -22,5 +44,6 @@ router.get(
     authorizeRoles("lecturer"),
     getCourseStudents
 );
+
 
 module.exports = router;

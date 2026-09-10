@@ -10,6 +10,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import LecturerDashboard from "./pages/LecturerDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import StudentScan from "./pages/StudentScan";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
@@ -50,9 +51,19 @@ function App() {
             <ProtectedRoute allowedRole="student">
               <StudentScan />
             </ProtectedRoute>
+
+            
           }
         />
 
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
 
       </Routes>
     </BrowserRouter>

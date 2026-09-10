@@ -105,8 +105,10 @@ const createSession = async (req, res) => {
                             const sessionId = result.insertId;
 
                             // QR opens the student scan page
+                            const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, "");
+
                             const qrPayload =
-                                `${process.env.FRONTEND_URL}/student/scan?session_id=${sessionId}&token=${qrToken}`;
+                                `${frontendUrl}/student/scan?session_id=${sessionId}&token=${qrToken}`;
 
                             const qrCode =
                                 await QRCode.toDataURL(qrPayload);

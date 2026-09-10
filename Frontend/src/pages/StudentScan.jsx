@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import "../styles/dashboard.css";
+import "../styles/scan.css";
 
 function StudentScan() {
   const [searchParams] = useSearchParams();
@@ -15,6 +17,8 @@ function StudentScan() {
 
   const sessionId = searchParams.get("session_id");
   const qrToken = searchParams.get("token");
+
+  const isValidQr = Boolean(sessionId && qrToken);
 
   const handleMarkAttendance = () => {
     if (!sessionId || !qrToken) {
@@ -33,7 +37,9 @@ function StudentScan() {
     }
 
     if (!navigator.geolocation) {
-      setMessage("Geolocation is not supported by this browser.");
+      setMessage(
+        "Geolocation is not supported by this browser."
+      );
       return;
     }
 
@@ -49,9 +55,12 @@ function StudentScan() {
 
         console.log("Student latitude:", latitude);
         console.log("Student longitude:", longitude);
-        console.log("Location accuracy:", accuracy, "metres");
+        console.log(
+          "Location accuracy:",
+          accuracy,
+          "metres"
+        );
 
-        // Reject very inaccurate GPS readings
         if (accuracy > 50) {
           setMessage(
             `Your location is currently only accurate to about ${Math.round(
@@ -127,57 +136,233 @@ function StudentScan() {
     );
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    navigate("/login");
+  };
+
   return (
-    <div>
-      <h1>Mark Attendance</h1>
+    <div className="dashboard-page">
 
-      <p>
-        Student: {user?.full_name || "Not logged in"}
-      </p>
-
-      <p>
-        Session ID: {sessionId || "Missing"}
-      </p>
-
-      {!token ? (
+      <header className="topbar">
         <div>
-          <p>
-            You need to log in before you can mark attendance.
-          </p>
+          <h2 className="brand-title">
+            Student Attendance System
+          </h2>
 
-          <button onClick={() => navigate("/login")}>
-            Go to Login
+          <p className="brand-subtitle">
+            Attendance Verification
+          </p>
+        </div>
+
+        {token && (
+          <button
+            className="secondary-button"
+            onClick={handleLogout}
+          >
+            Logout
           </button>
-        </div>
-      ) : (
-        <button
-          onClick={handleMarkAttendance}
-          disabled={loading}
-        >
-          {loading
-            ? "Checking location..."
-            : "Mark Attendance"}
-        </button>
-      )}
+        )}
+      </header>
 
-      {message && (
-        <p>{message}</p>
-      )}
+      <main className="scan-container">
 
-      {attendanceResult?.attendance && (
-        <div>
-          <h2>Attendance Confirmed</h2>
+        <section className="scan-card">
 
-          <p>
-            Status: {attendanceResult.attendance.status}
-          </p>
+          <div className="scan-header">
 
-          <p>
-            Distance from lecturer:{" "}
-            {attendanceResult.attendance.distance} metres
-          </p>
-        </div>
-      )}
+            <div className="scan-icon">
+              ✓
+            </div>
+
+            <p className="welcome-label">
+              Attendance Session
+            </p>
+
+            <h1>
+              Mark Attendance
+            </h1>
+
+            <p className="muted-text">
+              Verify your identity and current location
+              to record attendance.
+            </p>
+
+          </div>
+
+          <div className="scan-info-grid">
+
+            <div className="scan-info-item">
+              <span>
+                Student
+              </span>
+
+              <strong>
+                {user?.full_name || "Not logged in"}
+              </strong>
+            </div>
+
+            <div className="scan-info-item">
+              <span>
+                Student Number
+              </span>
+
+              <strong>
+                {user?.student_number || "N/A"}
+              </strong>
+            </div>
+
+            <div className="scan-info-item">
+              <span>
+                Session ID
+              </span>
+
+              <strong>
+                {sessionId || "Missing"}
+              </strong>
+            </div>
+
+            <div className="scan-info-item">
+              <span>
+                QR Status
+              </span>
+
+              <strong
+                className={
+                  isValidQr
+                    ? "scan-valid"
+                    : "scan-invalid"
+                }
+              >
+                {isValidQr
+                  ? "Detected"
+                  : "Invalid"}
+              </strong>
+            </div>
+
+          </div>
+
+          {!token ? (
+            <div className="scan-action-section">
+
+              <div className="info-box">
+                You need to sign in before attendance
+                can be recorded.
+              </div>
+
+              <button
+                className="primary-button scan-main-button"
+                onClick={() => navigate("/login")}
+              >
+                Go to Login
+              </button>
+
+            </div>
+          ) : (
+            <div className="scan-action-section">
+
+              <div className="scan-location-note">
+                <strong>
+                  Location verification required
+                </strong>
+
+                <p>
+                  Your device will request high-accuracy
+                  location access. You must be within the
+                  lecturer's permitted attendance radius.
+                </p>
+              </div>
+
+              <button
+                className="primary-button scan-main-button"
+                onClick={handleMarkAttendance}
+                disabled={loading || !isValidQr}
+              >
+                {loading
+                  ? "Checking Location..."
+                  : "Mark Attendance"}
+              </button>
+
+            </div>
+          )}
+
+          {message && (
+            <div
+              className={`scan-message ${
+                attendanceResult
+                  ? "scan-message-success"
+                  : ""
+              }`}
+            >
+              {loading && (
+                <div className="loading-dot" />
+              )}
+
+              <span>
+                {message}
+              </span>
+            </div>
+          )}
+
+          {attendanceResult?.attendance && (
+            <div className="attendance-confirmation">
+
+              <div className="confirmation-icon">
+                ✓
+              </div>
+
+              <h2>
+                Attendance Confirmed
+              </h2>
+
+              <p>
+                Your attendance has been recorded
+                successfully.
+              </p>
+
+              <div className="confirmation-details">
+
+                <div>
+                  <span>
+                    Status
+                  </span>
+
+                  <strong className="status-present">
+                    {attendanceResult.attendance.status}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    Distance from lecturer
+                  </span>
+
+                  <strong>
+                    {attendanceResult.attendance.distance}
+                    {" "}
+                    metres
+                  </strong>
+                </div>
+
+              </div>
+
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  navigate("/student/dashboard")
+                }
+              >
+                Return to Dashboard
+              </button>
+
+            </div>
+          )}
+
+        </section>
+
+      </main>
     </div>
   );
 }

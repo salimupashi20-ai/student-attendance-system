@@ -1,18 +1,30 @@
 const db = require("../config/db");
 
+// =====================================
+// LECTURER: ENROLL STUDENT
+// =====================================
+
 const enrollStudent = (req, res) => {
-    const { student_id, course_id } = req.body;
     const lecturerId = req.user.id;
+
+    const {
+        student_id,
+        course_id
+    } = req.body;
 
     if (!student_id || !course_id) {
         return res.status(400).json({
-            message: "Student ID and course ID are required."
+            message:
+                "Student ID and course ID are required."
         });
     }
 
+    // Confirm lecturer owns the course
     const courseQuery = `
-        SELECT * FROM courses
-        WHERE id = ? AND lecturer_id = ?
+        SELECT *
+        FROM courses
+        WHERE id = ?
+        AND lecturer_id = ?
     `;
 
     db.query(
@@ -27,13 +39,17 @@ const enrollStudent = (req, res) => {
 
             if (courseResults.length === 0) {
                 return res.status(403).json({
-                    message: "You are not authorized to manage this course."
+                    message:
+                        "You are not authorized to manage this course."
                 });
             }
 
+            // Confirm user is a student
             const studentQuery = `
-                SELECT * FROM users
-                WHERE id = ? AND role = 'student'
+                SELECT id
+                FROM users
+                WHERE id = ?
+                AND role = 'student'
             `;
 
             db.query(
@@ -48,36 +64,81 @@ const enrollStudent = (req, res) => {
 
                     if (studentResults.length === 0) {
                         return res.status(404).json({
-                            message: "Student not found."
+                            message:
+                                "Student not found."
                         });
                     }
 
-                    const enrollmentQuery = `
-                        INSERT INTO course_enrollments
-                        (student_id, course_id)
-                        VALUES (?, ?)
+                    // Check duplicate enrollment
+                    const duplicateQuery = `
+                        SELECT id
+                        FROM course_enrollments
+                        WHERE student_id = ?
+                        AND course_id = ?
                     `;
 
                     db.query(
-                        enrollmentQuery,
-                        [student_id, course_id],
-                        (err, result) => {
+                        duplicateQuery,
+                        [
+                            student_id,
+                            course_id
+                        ],
+                        (err, duplicateResults) => {
                             if (err) {
-                                if (err.code === "ER_DUP_ENTRY") {
-                                    return res.status(400).json({
-                                        message: "Student is already enrolled in this course."
+                                return res
+                                    .status(500)
+                                    .json({
+                                        error:
+                                            err.message
                                     });
-                                }
-
-                                return res.status(500).json({
-                                    error: err.message
-                                });
                             }
 
-                            res.status(201).json({
-                                message: "Student enrolled successfully",
-                                enrollmentId: result.insertId
-                            });
+                            if (
+                                duplicateResults.length > 0
+                            ) {
+                                return res
+                                    .status(400)
+                                    .json({
+                                        message:
+                                            "Student is already enrolled in this course."
+                                    });
+                            }
+
+                            const insertQuery = `
+                                INSERT INTO course_enrollments
+                                (
+                                    student_id,
+                                    course_id
+                                )
+                                VALUES (?, ?)
+                            `;
+
+                            db.query(
+                                insertQuery,
+                                [
+                                    student_id,
+                                    course_id
+                                ],
+                                (err, result) => {
+                                    if (err) {
+                                        return res
+                                            .status(500)
+                                            .json({
+                                                error:
+                                                    err.message
+                                            });
+                                    }
+
+                                    return res
+                                        .status(201)
+                                        .json({
+                                            message:
+                                                "Student enrolled successfully.",
+                                            enrollmentId:
+                                                result.insertId
+                                        });
+                                }
+                            );
                         }
                     );
                 }
@@ -86,13 +147,20 @@ const enrollStudent = (req, res) => {
     );
 };
 
+
+// =====================================
+// LECTURER: VIEW COURSE STUDENTS
+// =====================================
+
 const getCourseStudents = (req, res) => {
-    const courseId = req.params.courseId;
     const lecturerId = req.user.id;
+    const courseId = req.params.courseId;
 
     const courseQuery = `
-        SELECT * FROM courses
-        WHERE id = ? AND lecturer_id = ?
+        SELECT *
+        FROM courses
+        WHERE id = ?
+        AND lecturer_id = ?
     `;
 
     db.query(
@@ -107,7 +175,8 @@ const getCourseStudents = (req, res) => {
 
             if (courseResults.length === 0) {
                 return res.status(403).json({
-                    message: "You are not authorized to view this course."
+                    message:
+                        "You are not authorized to view students for this course."
                 });
             }
 
@@ -134,8 +203,9 @@ const getCourseStudents = (req, res) => {
                         });
                     }
 
-                    res.status(200).json({
-                        message: "Enrolled students retrieved successfully",
+                    return res.status(200).json({
+                        message:
+                            "Course students retrieved successfully.",
                         students: results
                     });
                 }
@@ -144,7 +214,60 @@ const getCourseStudents = (req, res) => {
     );
 };
 
+
+// =====================================
+// STUDENT: VIEW MY COURSES
+// =====================================
+
+const getMyCourses = (req, res) => {
+    const studentId = req.user.id;
+
+    const query = `
+        SELECT
+            courses.id,
+            courses.course_code,
+            courses.course_name,
+
+            lecturer.full_name AS lecturer_name,
+            lecturer.staff_id AS lecturer_staff_id,
+
+            course_enrollments.enrolled_at
+
+        FROM course_enrollments
+
+        INNER JOIN courses
+            ON course_enrollments.course_id = courses.id
+
+        LEFT JOIN users lecturer
+            ON courses.lecturer_id = lecturer.id
+
+        WHERE course_enrollments.student_id = ?
+
+        ORDER BY courses.course_code ASC
+    `;
+
+    db.query(
+        query,
+        [studentId],
+        (err, results) => {
+            if (err) {
+                return res.status(500).json({
+                    error: err.message
+                });
+            }
+
+            return res.status(200).json({
+                message:
+                    "Enrolled courses retrieved successfully.",
+                courses: results
+            });
+        }
+    );
+};
+
+
 module.exports = {
     enrollStudent,
-    getCourseStudents
+    getCourseStudents,
+    getMyCourses
 };
