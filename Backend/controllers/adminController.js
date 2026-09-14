@@ -527,7 +527,6 @@ const createEnrollmentAdmin = (req, res) => {
         });
     }
 
-    // Confirm selected user is actually a student
     const studentQuery = `
         SELECT id
         FROM users
@@ -552,7 +551,6 @@ const createEnrollmentAdmin = (req, res) => {
                 });
             }
 
-            // Confirm course exists
             const courseQuery = `
                 SELECT id
                 FROM courses
@@ -578,7 +576,6 @@ const createEnrollmentAdmin = (req, res) => {
                         });
                     }
 
-                    // Prevent duplicate enrollment
                     const duplicateQuery = `
                         SELECT id
                         FROM course_enrollments
@@ -694,12 +691,28 @@ const deleteEnrollmentAdmin = (req, res) => {
         }
     );
 };
+
+
 // =====================================
 // ADMIN ATTENDANCE REPORTING
 // =====================================
 
-// View every attendance session in the system
+
+// =====================================
+// ALL ATTENDANCE SESSIONS
+// =====================================
+
 const getAllAttendanceSessions = (req, res) => {
+
+    /*
+        Historical enrollment rule:
+
+        A student counts for a lecture session only
+        if the student's enrollment existed before
+        the session was created.
+
+        ce.enrolled_at <= ls.created_at
+    */
 
     const query = `
         SELECT
@@ -720,17 +733,15 @@ const getAllAttendanceSessions = (req, res) => {
             lecturer.full_name AS lecturer_name,
             lecturer.staff_id AS lecturer_staff_id,
 
-            (
-                SELECT COUNT(*)
-                FROM course_enrollments ce
-                WHERE ce.course_id = ls.course_id
+            COUNT(
+                DISTINCT ce.student_id
             ) AS total_enrolled,
 
-            (
-                SELECT COUNT(*)
-                FROM attendance a
-                WHERE a.session_id = ls.id
-                AND a.status = 'present'
+            COUNT(
+                DISTINCT CASE
+                    WHEN a.status = 'present'
+                    THEN a.student_id
+                END
             ) AS total_present
 
         FROM lecture_sessions ls
@@ -740,6 +751,36 @@ const getAllAttendanceSessions = (req, res) => {
 
         LEFT JOIN users lecturer
             ON c.lecturer_id = lecturer.id
+
+        LEFT JOIN course_enrollments ce
+            ON ce.course_id = ls.course_id
+
+            AND ce.enrolled_at <=
+                ls.created_at
+
+        LEFT JOIN attendance a
+            ON a.session_id = ls.id
+
+            AND a.student_id =
+                ce.student_id
+
+            AND a.status = 'present'
+
+        GROUP BY
+            ls.id,
+            ls.course_id,
+            ls.session_date,
+            ls.start_time,
+            ls.end_time,
+            ls.qr_expires_at,
+            ls.allowed_radius,
+            ls.is_active,
+            ls.created_at,
+            c.course_code,
+            c.course_name,
+            lecturer.id,
+            lecturer.full_name,
+            lecturer.staff_id
 
         ORDER BY
             ls.session_date DESC,
@@ -754,49 +795,56 @@ const getAllAttendanceSessions = (req, res) => {
             });
         }
 
-        const sessions = results.map((session) => {
+        const sessions = results.map(
+            (session) => {
 
-            const totalEnrolled =
-                Number(session.total_enrolled) || 0;
+                const totalEnrolled =
+                    Number(
+                        session.total_enrolled
+                    ) || 0;
 
-            const totalPresent =
-                Number(session.total_present) || 0;
+                const totalPresent =
+                    Number(
+                        session.total_present
+                    ) || 0;
 
-            const totalAbsent =
-                Math.max(
-                    totalEnrolled - totalPresent,
-                    0
-                );
-
-            const attendancePercentage =
-                totalEnrolled === 0
-                    ? 0
-                    : Number(
-                        (
-                            (
-                                totalPresent /
-                                totalEnrolled
-                            ) *
-                            100
-                        ).toFixed(2)
+                const totalAbsent =
+                    Math.max(
+                        totalEnrolled -
+                        totalPresent,
+                        0
                     );
 
-            return {
-                ...session,
+                const attendancePercentage =
+                    totalEnrolled === 0
+                        ? 0
+                        : Number(
+                            (
+                                (
+                                    totalPresent /
+                                    totalEnrolled
+                                ) *
+                                100
+                            ).toFixed(2)
+                        );
 
-                total_enrolled:
-                    totalEnrolled,
+                return {
+                    ...session,
 
-                total_present:
-                    totalPresent,
+                    total_enrolled:
+                        totalEnrolled,
 
-                total_absent:
-                    totalAbsent,
+                    total_present:
+                        totalPresent,
 
-                attendance_percentage:
-                    attendancePercentage
-            };
-        });
+                    total_absent:
+                        totalAbsent,
+
+                    attendance_percentage:
+                        attendancePercentage
+                };
+            }
+        );
 
         return res.status(200).json({
             message:
@@ -812,7 +860,10 @@ const getAllAttendanceSessions = (req, res) => {
 // VIEW ONE SESSION'S ATTENDANCE
 // =====================================
 
-const getAdminSessionAttendance = (req, res) => {
+const getAdminSessionAttendance = (
+    req,
+    res
+) => {
 
     const sessionId =
         req.params.sessionId;
@@ -825,12 +876,16 @@ const getAdminSessionAttendance = (req, res) => {
             ls.start_time,
             ls.end_time,
             ls.is_active,
+            ls.created_at,
 
             c.course_code,
             c.course_name,
 
-            lecturer.full_name AS lecturer_name,
-            lecturer.staff_id AS lecturer_staff_id
+            lecturer.full_name
+                AS lecturer_name,
+
+            lecturer.staff_id
+                AS lecturer_staff_id
 
         FROM lecture_sessions ls
 
@@ -838,7 +893,8 @@ const getAdminSessionAttendance = (req, res) => {
             ON ls.course_id = c.id
 
         LEFT JOIN users lecturer
-            ON c.lecturer_id = lecturer.id
+            ON c.lecturer_id =
+               lecturer.id
 
         WHERE ls.id = ?
     `;
@@ -846,20 +902,36 @@ const getAdminSessionAttendance = (req, res) => {
     db.query(
         sessionQuery,
         [sessionId],
-        (err, sessionResults) => {
+        (
+            err,
+            sessionResults
+        ) => {
 
             if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            err.message
+                    });
             }
 
-            if (sessionResults.length === 0) {
-                return res.status(404).json({
-                    message:
-                        "Attendance session not found."
-                });
+            if (
+                sessionResults.length === 0
+            ) {
+                return res
+                    .status(404)
+                    .json({
+                        message:
+                            "Attendance session not found."
+                    });
             }
+
+            /*
+                Only return attendance from
+                students who were eligible
+                at the time of the session.
+            */
 
             const attendanceQuery = `
                 SELECT
@@ -871,40 +943,66 @@ const getAdminSessionAttendance = (req, res) => {
                     a.student_latitude,
                     a.student_longitude,
 
-                    student.full_name AS student_name,
+                    student.full_name
+                        AS student_name,
+
                     student.student_number
 
                 FROM attendance a
 
                 INNER JOIN users student
-                    ON a.student_id = student.id
+                    ON a.student_id =
+                       student.id
+
+                INNER JOIN lecture_sessions ls
+                    ON a.session_id =
+                       ls.id
+
+                INNER JOIN course_enrollments ce
+                    ON ce.student_id =
+                       a.student_id
+
+                    AND ce.course_id =
+                       ls.course_id
+
+                    AND ce.enrolled_at <=
+                       ls.created_at
 
                 WHERE a.session_id = ?
 
-                ORDER BY a.scan_time ASC
+                ORDER BY
+                    a.scan_time ASC
             `;
 
             db.query(
                 attendanceQuery,
                 [sessionId],
-                (err, attendanceResults) => {
+                (
+                    err,
+                    attendanceResults
+                ) => {
 
                     if (err) {
-                        return res.status(500).json({
-                            error: err.message
-                        });
+                        return res
+                            .status(500)
+                            .json({
+                                error:
+                                    err.message
+                            });
                     }
 
-                    return res.status(200).json({
-                        message:
-                            "Session attendance retrieved successfully.",
+                    return res
+                        .status(200)
+                        .json({
+                            message:
+                                "Session attendance retrieved successfully.",
 
-                        session:
-                            sessionResults[0],
+                            session:
+                                sessionResults[0],
 
-                        attendance:
-                            attendanceResults
-                    });
+                            attendance:
+                                attendanceResults
+                        });
                 }
             );
         }
@@ -916,33 +1014,43 @@ const getAdminSessionAttendance = (req, res) => {
 // ADMIN SESSION SUMMARY
 // =====================================
 
-const getAdminSessionSummary = (req, res) => {
+const getAdminSessionSummary = (
+    req,
+    res
+) => {
 
     const sessionId =
         req.params.sessionId;
+
+    /*
+        This query calculates enrollment
+        at the historical session level.
+    */
 
     const query = `
         SELECT
             ls.id AS session_id,
             ls.course_id,
+            ls.created_at,
 
             c.course_code,
             c.course_name,
 
-            lecturer.full_name AS lecturer_name,
-            lecturer.staff_id AS lecturer_staff_id,
+            lecturer.full_name
+                AS lecturer_name,
 
-            (
-                SELECT COUNT(*)
-                FROM course_enrollments ce
-                WHERE ce.course_id = ls.course_id
+            lecturer.staff_id
+                AS lecturer_staff_id,
+
+            COUNT(
+                DISTINCT ce.student_id
             ) AS total_enrolled,
 
-            (
-                SELECT COUNT(*)
-                FROM attendance a
-                WHERE a.session_id = ls.id
-                AND a.status = 'present'
+            COUNT(
+                DISTINCT CASE
+                    WHEN a.status = 'present'
+                    THEN a.student_id
+                END
             ) AS total_present
 
         FROM lecture_sessions ls
@@ -951,40 +1059,83 @@ const getAdminSessionSummary = (req, res) => {
             ON ls.course_id = c.id
 
         LEFT JOIN users lecturer
-            ON c.lecturer_id = lecturer.id
+            ON c.lecturer_id =
+               lecturer.id
+
+        LEFT JOIN course_enrollments ce
+            ON ce.course_id =
+               ls.course_id
+
+            AND ce.enrolled_at <=
+               ls.created_at
+
+        LEFT JOIN attendance a
+            ON a.session_id =
+               ls.id
+
+            AND a.student_id =
+               ce.student_id
+
+            AND a.status =
+                'present'
 
         WHERE ls.id = ?
+
+        GROUP BY
+            ls.id,
+            ls.course_id,
+            ls.created_at,
+            c.course_code,
+            c.course_name,
+            lecturer.full_name,
+            lecturer.staff_id
     `;
 
     db.query(
         query,
         [sessionId],
-        (err, results) => {
+        (
+            err,
+            results
+        ) => {
 
             if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            err.message
+                    });
             }
 
-            if (results.length === 0) {
-                return res.status(404).json({
-                    message:
-                        "Attendance session not found."
-                });
+            if (
+                results.length === 0
+            ) {
+                return res
+                    .status(404)
+                    .json({
+                        message:
+                            "Attendance session not found."
+                    });
             }
 
-            const session = results[0];
+            const session =
+                results[0];
 
             const totalEnrolled =
-                Number(session.total_enrolled) || 0;
+                Number(
+                    session.total_enrolled
+                ) || 0;
 
             const totalPresent =
-                Number(session.total_present) || 0;
+                Number(
+                    session.total_present
+                ) || 0;
 
             const totalAbsent =
                 Math.max(
-                    totalEnrolled - totalPresent,
+                    totalEnrolled -
+                    totalPresent,
                     0
                 );
 
@@ -1001,42 +1152,47 @@ const getAdminSessionSummary = (req, res) => {
                         ).toFixed(2)
                     );
 
-            return res.status(200).json({
-                message:
-                    "Attendance summary retrieved successfully.",
+            return res
+                .status(200)
+                .json({
+                    message:
+                        "Attendance summary retrieved successfully.",
 
-                summary: {
-                    session_id:
-                        Number(session.session_id),
+                    summary:
+                    {
+                        session_id:
+                            Number(
+                                session.session_id
+                            ),
 
-                    course_id:
-                        session.course_id,
+                        course_id:
+                            session.course_id,
 
-                    course_code:
-                        session.course_code,
+                        course_code:
+                            session.course_code,
 
-                    course_name:
-                        session.course_name,
+                        course_name:
+                            session.course_name,
 
-                    lecturer_name:
-                        session.lecturer_name,
+                        lecturer_name:
+                            session.lecturer_name,
 
-                    lecturer_staff_id:
-                        session.lecturer_staff_id,
+                        lecturer_staff_id:
+                            session.lecturer_staff_id,
 
-                    total_enrolled:
-                        totalEnrolled,
+                        total_enrolled:
+                            totalEnrolled,
 
-                    total_present:
-                        totalPresent,
+                        total_present:
+                            totalPresent,
 
-                    total_absent:
-                        totalAbsent,
+                        total_absent:
+                            totalAbsent,
 
-                    attendance_percentage:
-                        attendancePercentage
-                }
-            });
+                        attendance_percentage:
+                            attendancePercentage
+                    }
+                });
         }
     );
 };
@@ -1046,7 +1202,20 @@ const getAdminSessionSummary = (req, res) => {
 // SYSTEM-WIDE ATTENDANCE OVERVIEW
 // =====================================
 
-const getAdminAttendanceOverview = (req, res) => {
+const getAdminAttendanceOverview = (
+    req,
+    res
+) => {
+
+    /*
+        This overview is not calculating
+        per-session absence rates, so the
+        historical enrollment change does
+        not materially affect these totals.
+
+        total_enrollments = current
+        enrollment relationships.
+    */
 
     const query = `
         SELECT
@@ -1074,36 +1243,62 @@ const getAdminAttendanceOverview = (req, res) => {
             ) AS total_enrollments
     `;
 
-    db.query(query, (err, results) => {
+    db.query(
+        query,
+        (
+            err,
+            results
+        ) => {
 
-        if (err) {
-            return res.status(500).json({
-                error: err.message
-            });
-        }
-
-        const data = results[0];
-
-        return res.status(200).json({
-            message:
-                "Attendance overview retrieved successfully.",
-
-            overview: {
-                total_sessions:
-                    Number(data.total_sessions) || 0,
-
-                active_sessions:
-                    Number(data.active_sessions) || 0,
-
-                attendance_records:
-                    Number(data.attendance_records) || 0,
-
-                total_enrollments:
-                    Number(data.total_enrollments) || 0
+            if (err) {
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            err.message
+                    });
             }
-        });
-    });
+
+            const data =
+                results[0];
+
+            return res
+                .status(200)
+                .json({
+                    message:
+                        "Attendance overview retrieved successfully.",
+
+                    overview:
+                    {
+                        total_sessions:
+                            Number(
+                                data.total_sessions
+                            ) || 0,
+
+                        active_sessions:
+                            Number(
+                                data.active_sessions
+                            ) || 0,
+
+                        attendance_records:
+                            Number(
+                                data.attendance_records
+                            ) || 0,
+
+                        total_enrollments:
+                            Number(
+                                data.total_enrollments
+                            ) || 0
+                    }
+                });
+        }
+    );
 };
+
+
+// =====================================
+// EXPORTS
+// =====================================
 
 module.exports = {
     getAllUsers,

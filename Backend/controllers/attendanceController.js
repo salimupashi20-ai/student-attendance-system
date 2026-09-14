@@ -1,15 +1,26 @@
 const db = require("../config/db");
 
-// Calculate distance between two GPS coordinates in metres
-const calculateDistance = (lat1, lon1, lat2, lon2) => {
+// =====================================
+// DISTANCE CALCULATION
+// =====================================
+
+const calculateDistance = (
+    lat1,
+    lon1,
+    lat2,
+    lon2
+) => {
     const earthRadius = 6371000;
 
     const toRadians = (degrees) => {
         return degrees * (Math.PI / 180);
     };
 
-    const latitudeDifference = toRadians(lat2 - lat1);
-    const longitudeDifference = toRadians(lon2 - lon1);
+    const latitudeDifference =
+        toRadians(lat2 - lat1);
+
+    const longitudeDifference =
+        toRadians(lon2 - lon1);
 
     const a =
         Math.sin(latitudeDifference / 2) *
@@ -29,7 +40,13 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     return earthRadius * c;
 };
 
+
+// =====================================
+// STUDENT: SCAN QR CODE
+// =====================================
+
 const scanQRCode = (req, res) => {
+
     const {
         session_id,
         token,
@@ -39,21 +56,26 @@ const scanQRCode = (req, res) => {
 
     const studentId = req.user.id;
 
-    // 1. Validate QR details
+    // Validate QR details
     if (!session_id || !token) {
         return res.status(400).json({
-            message: "Session ID and QR token are required."
+            message:
+                "Session ID and QR token are required."
         });
     }
 
-    // 2. Validate student GPS coordinates
-    if (latitude == null || longitude == null) {
+    // Validate GPS
+    if (
+        latitude == null ||
+        longitude == null
+    ) {
         return res.status(400).json({
-            message: "Student location is required."
+            message:
+                "Student location is required."
         });
     }
 
-    // 3. Find matching lecture session
+    // Find matching session
     const sessionQuery = `
         SELECT *
         FROM lecture_sessions
@@ -65,6 +87,7 @@ const scanQRCode = (req, res) => {
         sessionQuery,
         [session_id, token],
         (err, sessionResults) => {
+
             if (err) {
                 return res.status(500).json({
                     error: err.message
@@ -73,64 +96,100 @@ const scanQRCode = (req, res) => {
 
             if (sessionResults.length === 0) {
                 return res.status(404).json({
-                    message: "Invalid QR code."
+                    message:
+                        "Invalid QR code."
                 });
             }
 
-            const session = sessionResults[0];
+            const session =
+                sessionResults[0];
 
-            // 4. Check session status
+            // Session must still be active
             if (!session.is_active) {
                 return res.status(400).json({
-                    message: "Attendance session is closed."
+                    message:
+                        "Attendance session is closed."
                 });
             }
 
-            // 5. Check QR expiry
-            const currentTime = new Date();
-            const expiryTime = new Date(session.qr_expires_at);
+            // QR must still be valid
+            const currentTime =
+                new Date();
+
+            const expiryTime =
+                new Date(
+                    session.qr_expires_at
+                );
 
             if (currentTime > expiryTime) {
                 return res.status(400).json({
-                    message: "QR code has expired."
+                    message:
+                        "QR code has expired."
                 });
             }
 
-            // 6. Make sure lecturer location exists
+            // Lecturer coordinates must exist
             if (
                 session.lecturer_latitude == null ||
                 session.lecturer_longitude == null
             ) {
                 return res.status(400).json({
-                    message: "Lecturer location is unavailable for this session."
+                    message:
+                        "Lecturer location is unavailable for this session."
                 });
             }
 
-            // 7. Check enrollment
+            /*
+                IMPORTANT:
+
+                Student must have already been enrolled
+                when this lecture session was created.
+
+                This prevents a student enrolled later
+                from attending an older session.
+            */
+
             const enrollmentQuery = `
                 SELECT *
                 FROM course_enrollments
                 WHERE student_id = ?
                 AND course_id = ?
+                AND enrolled_at <= ?
             `;
 
             db.query(
                 enrollmentQuery,
-                [studentId, session.course_id],
-                (err, enrollmentResults) => {
+                [
+                    studentId,
+                    session.course_id,
+                    session.created_at
+                ],
+                (
+                    err,
+                    enrollmentResults
+                ) => {
+
                     if (err) {
-                        return res.status(500).json({
-                            error: err.message
-                        });
+                        return res
+                            .status(500)
+                            .json({
+                                error:
+                                    err.message
+                            });
                     }
 
-                    if (enrollmentResults.length === 0) {
-                        return res.status(403).json({
-                            message: "You are not enrolled in this course."
-                        });
+                    if (
+                        enrollmentResults.length === 0
+                    ) {
+                        return res
+                            .status(403)
+                            .json({
+                                message:
+                                    "You were not enrolled in this course when this session started."
+                            });
                     }
 
-                    // 8. Check duplicate attendance
+                    // Check duplicate attendance
                     const duplicateQuery = `
                         SELECT *
                         FROM attendance
@@ -140,42 +199,82 @@ const scanQRCode = (req, res) => {
 
                     db.query(
                         duplicateQuery,
-                        [studentId, session_id],
-                        (err, attendanceResults) => {
+                        [
+                            studentId,
+                            session_id
+                        ],
+                        (
+                            err,
+                            attendanceResults
+                        ) => {
+
                             if (err) {
-                                return res.status(500).json({
-                                    error: err.message
-                                });
+                                return res
+                                    .status(500)
+                                    .json({
+                                        error:
+                                            err.message
+                                    });
                             }
 
-                            if (attendanceResults.length > 0) {
-                                return res.status(400).json({
-                                    message: "Attendance already recorded for this session."
-                                });
+                            if (
+                                attendanceResults.length >
+                                0
+                            ) {
+                                return res
+                                    .status(400)
+                                    .json({
+                                        message:
+                                            "Attendance already recorded for this session."
+                                    });
                             }
 
-                            // 9. Calculate GPS distance
-                            const distance = calculateDistance(
-                                Number(latitude),
-                                Number(longitude),
-                                Number(session.lecturer_latitude),
-                                Number(session.lecturer_longitude)
-                            );
+                            // Calculate GPS distance
+                            const distance =
+                                calculateDistance(
+                                    Number(
+                                        latitude
+                                    ),
+                                    Number(
+                                        longitude
+                                    ),
+                                    Number(
+                                        session
+                                            .lecturer_latitude
+                                    ),
+                                    Number(
+                                        session
+                                            .lecturer_longitude
+                                    )
+                                );
 
                             const allowedRadius =
-                                Number(session.allowed_radius) || 50;
+                                Number(
+                                    session.allowed_radius
+                                ) || 50;
 
-                            // 10. Reject if outside geofence
-                            if (distance > allowedRadius) {
-                                return res.status(403).json({
-                                    message: "You are outside the allowed attendance area.",
-                                    distance: Math.round(distance),
-                                    allowed_radius: allowedRadius
-                                });
+                            if (
+                                distance >
+                                allowedRadius
+                            ) {
+                                return res
+                                    .status(403)
+                                    .json({
+                                        message:
+                                            "You are outside the allowed attendance area.",
+
+                                        distance:
+                                            Math.round(
+                                                distance
+                                            ),
+
+                                        allowed_radius:
+                                            allowedRadius
+                                    });
                             }
 
-                            // 11. Record attendance
-                            const insertAttendanceQuery = `
+                            // Record attendance
+                            const insertQuery = `
                                 INSERT INTO attendance
                                 (
                                     student_id,
@@ -189,7 +288,7 @@ const scanQRCode = (req, res) => {
                             `;
 
                             db.query(
-                                insertAttendanceQuery,
+                                insertQuery,
                                 [
                                     studentId,
                                     session_id,
@@ -198,23 +297,50 @@ const scanQRCode = (req, res) => {
                                     distance,
                                     "present"
                                 ],
-                                (err, result) => {
+                                (
+                                    err,
+                                    result
+                                ) => {
+
                                     if (err) {
-                                        return res.status(500).json({
-                                            error: err.message
-                                        });
+                                        return res
+                                            .status(
+                                                500
+                                            )
+                                            .json({
+                                                error:
+                                                    err.message
+                                            });
                                     }
 
-                                    return res.status(201).json({
-                                        message: "Attendance recorded successfully.",
-                                        attendance: {
-                                            id: result.insertId,
-                                            student_id: studentId,
-                                            session_id: Number(session_id),
-                                            status: "present",
-                                            distance: Math.round(distance)
-                                        }
-                                    });
+                                    return res
+                                        .status(201)
+                                        .json({
+                                            message:
+                                                "Attendance recorded successfully.",
+
+                                            attendance:
+                                            {
+                                                id:
+                                                    result.insertId,
+
+                                                student_id:
+                                                    studentId,
+
+                                                session_id:
+                                                    Number(
+                                                        session_id
+                                                    ),
+
+                                                status:
+                                                    "present",
+
+                                                distance:
+                                                    Math.round(
+                                                        distance
+                                                    )
+                                            }
+                                        });
                                 }
                             );
                         }
@@ -225,11 +351,19 @@ const scanQRCode = (req, res) => {
     );
 };
 
-const getSessionAttendance = (req, res) => {
-    const sessionId = req.params.sessionId;
-    const lecturerId = req.user.id;
 
-    // First confirm that this session belongs to the logged-in lecturer
+// =====================================
+// LECTURER: SESSION ATTENDANCE
+// =====================================
+
+const getSessionAttendance = (req, res) => {
+
+    const sessionId =
+        req.params.sessionId;
+
+    const lecturerId =
+        req.user.id;
+
     const sessionQuery = `
         SELECT *
         FROM lecture_sessions
@@ -239,61 +373,132 @@ const getSessionAttendance = (req, res) => {
 
     db.query(
         sessionQuery,
-        [sessionId, lecturerId],
-        (err, sessionResults) => {
+        [
+            sessionId,
+            lecturerId
+        ],
+        (
+            err,
+            sessionResults
+        ) => {
+
             if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            err.message
+                    });
             }
 
-            if (sessionResults.length === 0) {
-                return res.status(403).json({
-                    message: "You are not authorized to view this session."
-                });
+            if (
+                sessionResults.length === 0
+            ) {
+                return res
+                    .status(403)
+                    .json({
+                        message:
+                            "You are not authorized to view this session."
+                    });
             }
+
+            /*
+                Only show attendance belonging
+                to students who were eligible
+                when the session was created.
+            */
 
             const attendanceQuery = `
                 SELECT
                     attendance.id,
-                    users.id AS student_id,
+
+                    users.id
+                        AS student_id,
+
                     users.full_name,
+
                     users.student_number,
+
                     attendance.scan_time,
+
                     attendance.status,
+
                     attendance.distance_from_lecturer
+
                 FROM attendance
+
                 INNER JOIN users
-                    ON attendance.student_id = users.id
+                    ON attendance.student_id =
+                       users.id
+
+                INNER JOIN lecture_sessions ls
+                    ON attendance.session_id =
+                       ls.id
+
+                INNER JOIN course_enrollments ce
+                    ON ce.student_id =
+                       attendance.student_id
+
+                    AND ce.course_id =
+                       ls.course_id
+
+                    AND ce.enrolled_at <=
+                       ls.created_at
+
                 WHERE attendance.session_id = ?
-                ORDER BY attendance.scan_time ASC
+
+                ORDER BY
+                    attendance.scan_time ASC
             `;
 
             db.query(
                 attendanceQuery,
                 [sessionId],
-                (err, results) => {
+                (
+                    err,
+                    results
+                ) => {
+
                     if (err) {
-                        return res.status(500).json({
-                            error: err.message
-                        });
+                        return res
+                            .status(500)
+                            .json({
+                                error:
+                                    err.message
+                            });
                     }
 
-                    res.status(200).json({
-                        message: "Attendance records retrieved successfully.",
-                        attendance: results
-                    });
+                    return res
+                        .status(200)
+                        .json({
+                            message:
+                                "Attendance records retrieved successfully.",
+
+                            attendance:
+                                results
+                        });
                 }
             );
         }
     );
 };
 
-const getAttendanceSummary = (req, res) => {
-    const sessionId = req.params.sessionId;
-    const lecturerId = req.user.id;
 
-    // Confirm the session belongs to this lecturer
+// =====================================
+// LECTURER: ONE SESSION SUMMARY
+// =====================================
+
+const getAttendanceSummary = (
+    req,
+    res
+) => {
+
+    const sessionId =
+        req.params.sessionId;
+
+    const lecturerId =
+        req.user.id;
+
     const sessionQuery = `
         SELECT *
         FROM lecture_sessions
@@ -303,87 +508,183 @@ const getAttendanceSummary = (req, res) => {
 
     db.query(
         sessionQuery,
-        [sessionId, lecturerId],
-        (err, sessionResults) => {
+        [
+            sessionId,
+            lecturerId
+        ],
+        (
+            err,
+            sessionResults
+        ) => {
+
             if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            err.message
+                    });
             }
 
-            if (sessionResults.length === 0) {
-                return res.status(403).json({
-                    message: "You are not authorized to view this session."
-                });
+            if (
+                sessionResults.length === 0
+            ) {
+                return res
+                    .status(403)
+                    .json({
+                        message:
+                            "You are not authorized to view this session."
+                    });
             }
 
-            const session = sessionResults[0];
+            const session =
+                sessionResults[0];
 
-            // Count students enrolled in the course
+            /*
+                Count only students who were
+                enrolled before this session
+                was created.
+            */
+
             const enrolledQuery = `
                 SELECT COUNT(*) AS total_enrolled
                 FROM course_enrollments
                 WHERE course_id = ?
+                AND enrolled_at <= ?
             `;
 
             db.query(
                 enrolledQuery,
-                [session.course_id],
-                (err, enrolledResults) => {
+                [
+                    session.course_id,
+                    session.created_at
+                ],
+                (
+                    err,
+                    enrolledResults
+                ) => {
+
                     if (err) {
-                        return res.status(500).json({
-                            error: err.message
-                        });
+                        return res
+                            .status(500)
+                            .json({
+                                error:
+                                    err.message
+                            });
                     }
 
                     const totalEnrolled =
-                        Number(enrolledResults[0].total_enrolled);
+                        Number(
+                            enrolledResults[0]
+                                .total_enrolled
+                        ) || 0;
 
-                    // Count students who attended this session
+                    /*
+                        Count eligible students
+                        who actually attended.
+                    */
+
                     const presentQuery = `
-                        SELECT COUNT(*) AS total_present
+                        SELECT
+                            COUNT(
+                                DISTINCT attendance.student_id
+                            ) AS total_present
+
                         FROM attendance
-                        WHERE session_id = ?
-                        AND status = 'present'
+
+                        INNER JOIN course_enrollments ce
+                            ON ce.student_id =
+                               attendance.student_id
+
+                        INNER JOIN lecture_sessions ls
+                            ON ls.id =
+                               attendance.session_id
+
+                        WHERE attendance.session_id = ?
+
+                        AND attendance.status = 'present'
+
+                        AND ce.course_id =
+                            ls.course_id
+
+                        AND ce.enrolled_at <=
+                            ls.created_at
                     `;
 
                     db.query(
                         presentQuery,
                         [sessionId],
-                        (err, presentResults) => {
+                        (
+                            err,
+                            presentResults
+                        ) => {
+
                             if (err) {
-                                return res.status(500).json({
-                                    error: err.message
-                                });
+                                return res
+                                    .status(500)
+                                    .json({
+                                        error:
+                                            err.message
+                                    });
                             }
 
                             const totalPresent =
-                                Number(presentResults[0].total_present);
+                                Number(
+                                    presentResults[0]
+                                        .total_present
+                                ) || 0;
 
                             const totalAbsent =
-                                Math.max(totalEnrolled - totalPresent, 0);
+                                Math.max(
+                                    totalEnrolled -
+                                    totalPresent,
+                                    0
+                                );
 
                             const attendancePercentage =
                                 totalEnrolled === 0
                                     ? 0
                                     : Number(
                                         (
-                                            (totalPresent / totalEnrolled) *
+                                            (
+                                                totalPresent /
+                                                totalEnrolled
+                                            ) *
                                             100
-                                        ).toFixed(2)
+                                        ).toFixed(
+                                            2
+                                        )
                                     );
 
-                            return res.status(200).json({
-                                message: "Attendance summary retrieved successfully.",
-                                summary: {
-                                    session_id: Number(sessionId),
-                                    course_id: session.course_id,
-                                    total_enrolled: totalEnrolled,
-                                    total_present: totalPresent,
-                                    total_absent: totalAbsent,
-                                    attendance_percentage: attendancePercentage
-                                }
-                            });
+                            return res
+                                .status(200)
+                                .json({
+                                    message:
+                                        "Attendance summary retrieved successfully.",
+
+                                    summary:
+                                    {
+                                        session_id:
+                                            Number(
+                                                sessionId
+                                            ),
+
+                                        course_id:
+                                            session.course_id,
+
+                                        total_enrolled:
+                                            totalEnrolled,
+
+                                        total_present:
+                                            totalPresent,
+
+                                        total_absent:
+                                            totalAbsent,
+
+                                        attendance_percentage:
+                                            attendancePercentage
+                                    }
+                                });
                         }
                     );
                 }
@@ -391,8 +692,24 @@ const getAttendanceSummary = (req, res) => {
         }
     );
 };
-const getMyAttendanceHistory = (req, res) => {
-    const studentId = req.user.id;
+
+
+// =====================================
+// STUDENT: ATTENDANCE HISTORY
+// =====================================
+
+const getMyAttendanceHistory = (
+    req,
+    res
+) => {
+
+    const studentId =
+        req.user.id;
+
+    /*
+        Also verify the student was
+        enrolled before each session.
+    */
 
     const query = `
         SELECT
@@ -412,110 +729,162 @@ const getMyAttendanceHistory = (req, res) => {
         FROM attendance
 
         INNER JOIN lecture_sessions
-            ON attendance.session_id = lecture_sessions.id
+            ON attendance.session_id =
+               lecture_sessions.id
 
         INNER JOIN courses
-            ON lecture_sessions.course_id = courses.id
+            ON lecture_sessions.course_id =
+               courses.id
+
+        INNER JOIN course_enrollments ce
+            ON ce.student_id =
+               attendance.student_id
+
+            AND ce.course_id =
+               lecture_sessions.course_id
+
+            AND ce.enrolled_at <=
+               lecture_sessions.created_at
 
         WHERE attendance.student_id = ?
 
-        ORDER BY lecture_sessions.session_date DESC,
-                 lecture_sessions.start_time DESC
+        ORDER BY
+            lecture_sessions.session_date DESC,
+            lecture_sessions.start_time DESC
     `;
 
-    db.query(query, [studentId], (err, results) => {
-        if (err) {
-            return res.status(500).json({
-                error: err.message
-            });
-        }
+    db.query(
+        query,
+        [studentId],
+        (
+            err,
+            results
+        ) => {
 
-        return res.status(200).json({
-            message: "Attendance history retrieved successfully.",
-            attendance: results
-        });
-    });
+            if (err) {
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            err.message
+                    });
+            }
+
+            return res
+                .status(200)
+                .json({
+                    message:
+                        "Attendance history retrieved successfully.",
+
+                    attendance:
+                        results
+                });
+        }
+    );
 };
+
+
 // =====================================
 // STUDENT: TRUE ATTENDANCE SUMMARY
 // =====================================
 
-const getMyAttendanceSummary = (req, res) => {
-    const studentId = req.user.id;
+const getMyAttendanceSummary = (
+    req,
+    res
+) => {
+
+    const studentId =
+        req.user.id;
 
     /*
-        Count every completed/closed lecture session for
-        courses the student is enrolled in.
+        Count only sessions:
 
-        A session counts if:
-        - it was created after the student enrolled
-        - AND it has been closed OR its scheduled end time has passed
-
-        Then check whether the student has a "present"
-        attendance record for that session.
+        1. belonging to enrolled courses
+        2. created after the student's enrollment
+        3. that are already completed/closed
     */
 
     const query = `
         SELECT
-            COUNT(DISTINCT lecture_sessions.id) AS total_sessions,
+
+            COUNT(
+                DISTINCT ls.id
+            ) AS total_sessions,
 
             COUNT(
                 DISTINCT CASE
                     WHEN attendance.id IS NOT NULL
-                    THEN lecture_sessions.id
+                    THEN ls.id
                 END
             ) AS total_present
 
-        FROM course_enrollments
+        FROM course_enrollments ce
 
-        INNER JOIN lecture_sessions
-            ON course_enrollments.course_id =
-               lecture_sessions.course_id
+        INNER JOIN lecture_sessions ls
+            ON ce.course_id =
+               ls.course_id
 
-            AND TIMESTAMP(
-                lecture_sessions.session_date,
-                lecture_sessions.start_time
-            ) >= course_enrollments.enrolled_at
+            AND ce.enrolled_at <=
+               ls.created_at
 
         LEFT JOIN attendance
             ON attendance.session_id =
-               lecture_sessions.id
+               ls.id
 
             AND attendance.student_id = ?
 
-            AND attendance.status = 'present'
+            AND attendance.status =
+                'present'
 
-        WHERE course_enrollments.student_id = ?
+        WHERE ce.student_id = ?
 
-        AND (
-            lecture_sessions.is_active = 0
+        AND
+        (
+            ls.is_active = 0
 
             OR TIMESTAMP(
-                lecture_sessions.session_date,
-                lecture_sessions.end_time
+                ls.session_date,
+                ls.end_time
             ) <= NOW()
         )
     `;
 
     db.query(
         query,
-        [studentId, studentId],
-        (err, results) => {
+        [
+            studentId,
+            studentId
+        ],
+        (
+            err,
+            results
+        ) => {
+
             if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            err.message
+                    });
             }
 
             const totalSessions =
-                Number(results[0].total_sessions) || 0;
+                Number(
+                    results[0]
+                        .total_sessions
+                ) || 0;
 
             const totalPresent =
-                Number(results[0].total_present) || 0;
+                Number(
+                    results[0]
+                        .total_present
+                ) || 0;
 
             const totalAbsent =
                 Math.max(
-                    totalSessions - totalPresent,
+                    totalSessions -
+                    totalPresent,
                     0
                 );
 
@@ -532,26 +901,48 @@ const getMyAttendanceSummary = (req, res) => {
                         ).toFixed(2)
                     );
 
-            return res.status(200).json({
-                message:
-                    "Student attendance summary retrieved successfully.",
+            return res
+                .status(200)
+                .json({
+                    message:
+                        "Student attendance summary retrieved successfully.",
 
-                summary: {
-                    total_sessions: totalSessions,
-                    total_present: totalPresent,
-                    total_absent: totalAbsent,
-                    attendance_percentage:
-                        attendancePercentage
-                }
-            });
+                    summary:
+                    {
+                        total_sessions:
+                            totalSessions,
+
+                        total_present:
+                            totalPresent,
+
+                        total_absent:
+                            totalAbsent,
+
+                        attendance_percentage:
+                            attendancePercentage
+                    }
+                });
         }
     );
 };
-const getCourseAttendanceStats = (req, res) => {
-    const courseId = req.params.courseId;
-    const lecturerId = req.user.id;
 
-    // First confirm the course belongs to this lecturer
+
+// =====================================
+// LECTURER: COURSE ANALYTICS
+// =====================================
+
+const getCourseAttendanceStats = (
+    req,
+    res
+) => {
+
+    const courseId =
+        req.params.courseId;
+
+    const lecturerId =
+        req.user.id;
+
+    // Verify ownership
     const courseQuery = `
         SELECT *
         FROM courses
@@ -561,193 +952,293 @@ const getCourseAttendanceStats = (req, res) => {
 
     db.query(
         courseQuery,
-        [courseId, lecturerId],
-        (err, courseResults) => {
+        [
+            courseId,
+            lecturerId
+        ],
+        (
+            err,
+            courseResults
+        ) => {
+
             if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
+                return res
+                    .status(500)
+                    .json({
+                        error:
+                            err.message
+                    });
             }
 
-            if (courseResults.length === 0) {
-                return res.status(403).json({
-                    message: "You are not authorized to view statistics for this course."
-                });
+            if (
+                courseResults.length === 0
+            ) {
+                return res
+                    .status(403)
+                    .json({
+                        message:
+                            "You are not authorized to view statistics for this course."
+                    });
             }
 
-            // Count enrolled students
-            const enrolledQuery = `
-                SELECT COUNT(*) AS total_enrolled
-                FROM course_enrollments
-                WHERE course_id = ?
+            /*
+                IMPORTANT:
+
+                Each lecture gets its OWN
+                historical enrollment count.
+
+                We do NOT use today's course
+                enrollment count for every
+                historical session.
+            */
+
+            const analyticsQuery = `
+                SELECT
+                    ls.id AS session_id,
+
+                    ls.session_date,
+
+                    ls.start_time,
+
+                    ls.end_time,
+
+                    ls.created_at,
+
+                    ls.is_active,
+
+                    COUNT(
+                        DISTINCT ce.student_id
+                    ) AS total_enrolled,
+
+                    COUNT(
+                        DISTINCT CASE
+                            WHEN attendance.status =
+                                'present'
+                            THEN attendance.student_id
+                        END
+                    ) AS total_present
+
+                FROM lecture_sessions ls
+
+                LEFT JOIN course_enrollments ce
+                    ON ce.course_id =
+                       ls.course_id
+
+                    AND ce.enrolled_at <=
+                       ls.created_at
+
+                LEFT JOIN attendance
+                    ON attendance.session_id =
+                       ls.id
+
+                    AND attendance.student_id =
+                       ce.student_id
+
+                    AND attendance.status =
+                        'present'
+
+                WHERE ls.course_id = ?
+
+                GROUP BY
+                    ls.id,
+                    ls.session_date,
+                    ls.start_time,
+                    ls.end_time,
+                    ls.created_at,
+                    ls.is_active
+
+                ORDER BY
+                    ls.session_date ASC,
+                    ls.start_time ASC
             `;
 
             db.query(
-                enrolledQuery,
+                analyticsQuery,
                 [courseId],
-                (err, enrolledResults) => {
+                (
+                    err,
+                    results
+                ) => {
+
                     if (err) {
-                        return res.status(500).json({
-                            error: err.message
-                        });
+                        return res
+                            .status(500)
+                            .json({
+                                error:
+                                    err.message
+                            });
                     }
 
-                    const totalEnrolled =
-                        Number(enrolledResults[0].total_enrolled);
+                    const sessionStatistics =
+                        results.map(
+                            (
+                                session
+                            ) => {
 
-                    // Get all sessions for this course
-                    const sessionsQuery = `
+                                const totalEnrolled =
+                                    Number(
+                                        session
+                                            .total_enrolled
+                                    ) || 0;
+
+                                const totalPresent =
+                                    Number(
+                                        session
+                                            .total_present
+                                    ) || 0;
+
+                                const totalAbsent =
+                                    Math.max(
+                                        totalEnrolled -
+                                        totalPresent,
+                                        0
+                                    );
+
+                                const percentage =
+                                    totalEnrolled ===
+                                    0
+                                        ? 0
+                                        : Number(
+                                            (
+                                                (
+                                                    totalPresent /
+                                                    totalEnrolled
+                                                ) *
+                                                100
+                                            ).toFixed(
+                                                2
+                                            )
+                                        );
+
+                                return {
+                                    session_id:
+                                        session.session_id,
+
+                                    session_date:
+                                        session.session_date,
+
+                                    start_time:
+                                        session.start_time,
+
+                                    end_time:
+                                        session.end_time,
+
+                                    is_active:
+                                        session.is_active,
+
+                                    total_enrolled:
+                                        totalEnrolled,
+
+                                    total_present:
+                                        totalPresent,
+
+                                    total_absent:
+                                        totalAbsent,
+
+                                    attendance_percentage:
+                                        percentage
+                                };
+                            }
+                        );
+
+                    const totalPercentages =
+                        sessionStatistics.reduce(
+                            (
+                                sum,
+                                session
+                            ) =>
+                                sum +
+                                session
+                                    .attendance_percentage,
+                            0
+                        );
+
+                    const averageAttendance =
+                        sessionStatistics.length ===
+                        0
+                            ? 0
+                            : Number(
+                                (
+                                    totalPercentages /
+                                    sessionStatistics.length
+                                ).toFixed(
+                                    2
+                                )
+                            );
+
+                    /*
+                        Current enrollment is still
+                        useful as a top-level course
+                        statistic.
+
+                        Historical sessions use their
+                        own enrollment counts.
+                    */
+
+                    const currentEnrollmentQuery = `
                         SELECT
-                            id,
-                            session_date,
-                            start_time,
-                            end_time,
-                            is_active
-                        FROM lecture_sessions
+                            COUNT(*) AS total_enrolled
+                        FROM course_enrollments
                         WHERE course_id = ?
-                        ORDER BY session_date ASC,
-                                 start_time ASC
                     `;
 
                     db.query(
-                        sessionsQuery,
+                        currentEnrollmentQuery,
                         [courseId],
-                        (err, sessions) => {
+                        (
+                            err,
+                            enrollmentResults
+                        ) => {
+
                             if (err) {
-                                return res.status(500).json({
-                                    error: err.message
-                                });
-                            }
-
-                            if (sessions.length === 0) {
-                                return res.status(200).json({
-                                    message: "No lecture sessions found for this course.",
-                                    statistics: {
-                                        course_id: Number(courseId),
-                                        total_enrolled: totalEnrolled,
-                                        total_sessions: 0,
-                                        average_attendance_percentage: 0,
-                                        sessions: []
-                                    }
-                                });
-                            }
-
-                            // Count attendance per session
-                            const attendanceQuery = `
-                                SELECT
-                                    lecture_sessions.id AS session_id,
-                                    lecture_sessions.session_date,
-                                    COUNT(attendance.id) AS total_present
-                                FROM lecture_sessions
-
-                                LEFT JOIN attendance
-                                    ON lecture_sessions.id = attendance.session_id
-                                    AND attendance.status = 'present'
-
-                                WHERE lecture_sessions.course_id = ?
-
-                                GROUP BY
-                                    lecture_sessions.id,
-                                    lecture_sessions.session_date
-
-                                ORDER BY lecture_sessions.session_date ASC
-                            `;
-
-                            db.query(
-                                attendanceQuery,
-                                [courseId],
-                                (err, attendanceResults) => {
-                                    if (err) {
-                                        return res.status(500).json({
-                                            error: err.message
-                                        });
-                                    }
-
-                                    const sessionStatistics =
-                                        attendanceResults.map((session) => {
-
-                                            const totalPresent =
-                                                Number(session.total_present);
-
-                                            const totalAbsent =
-                                                Math.max(
-                                                    totalEnrolled - totalPresent,
-                                                    0
-                                                );
-
-                                            const percentage =
-                                                totalEnrolled === 0
-                                                    ? 0
-                                                    : Number(
-                                                        (
-                                                            (
-                                                                totalPresent /
-                                                                totalEnrolled
-                                                            ) *
-                                                            100
-                                                        ).toFixed(2)
-                                                    );
-
-                                            return {
-                                                session_id:
-                                                    session.session_id,
-
-                                                session_date:
-                                                    session.session_date,
-
-                                                total_present:
-                                                    totalPresent,
-
-                                                total_absent:
-                                                    totalAbsent,
-
-                                                attendance_percentage:
-                                                    percentage
-                                            };
-                                        });
-
-                                    const totalPercentages =
-                                        sessionStatistics.reduce(
-                                            (sum, session) =>
-                                                sum +
-                                                session.attendance_percentage,
-                                            0
-                                        );
-
-                                    const averageAttendance =
-                                        sessionStatistics.length === 0
-                                            ? 0
-                                            : Number(
-                                                (
-                                                    totalPercentages /
-                                                    sessionStatistics.length
-                                                ).toFixed(2)
-                                            );
-
-                                    return res.status(200).json({
-                                        message: "Course attendance statistics retrieved successfully.",
-                                        statistics: {
-                                            course_id: Number(courseId),
-                                            course_code:
-                                                courseResults[0].course_code,
-                                            course_name:
-                                                courseResults[0].course_name,
-
-                                            total_enrolled:
-                                                totalEnrolled,
-
-                                            total_sessions:
-                                                sessionStatistics.length,
-
-                                            average_attendance_percentage:
-                                                averageAttendance,
-
-                                            sessions:
-                                                sessionStatistics
-                                        }
+                                return res
+                                    .status(500)
+                                    .json({
+                                        error:
+                                            err.message
                                     });
-                                }
-                            );
+                            }
+
+                            const currentTotalEnrolled =
+                                Number(
+                                    enrollmentResults[0]
+                                        .total_enrolled
+                                ) || 0;
+
+                            return res
+                                .status(200)
+                                .json({
+                                    message:
+                                        "Course attendance statistics retrieved successfully.",
+
+                                    statistics:
+                                    {
+                                        course_id:
+                                            Number(
+                                                courseId
+                                            ),
+
+                                        course_code:
+                                            courseResults[0]
+                                                .course_code,
+
+                                        course_name:
+                                            courseResults[0]
+                                                .course_name,
+
+                                        total_enrolled:
+                                            currentTotalEnrolled,
+
+                                        total_sessions:
+                                            sessionStatistics.length,
+
+                                        average_attendance_percentage:
+                                            averageAttendance,
+
+                                        sessions:
+                                            sessionStatistics
+                                    }
+                                });
                         }
                     );
                 }
@@ -755,6 +1246,11 @@ const getCourseAttendanceStats = (req, res) => {
         }
     );
 };
+
+
+// =====================================
+// EXPORTS
+// =====================================
 
 module.exports = {
     scanQRCode,

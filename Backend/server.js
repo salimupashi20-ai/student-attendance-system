@@ -1,5 +1,10 @@
 require("dotenv").config();
 
+console.log(
+  "FRONTEND_URL being used:",
+  process.env.FRONTEND_URL
+);
+
 const express = require("express");
 const cors = require("cors");
 

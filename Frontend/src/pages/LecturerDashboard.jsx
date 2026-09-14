@@ -29,13 +29,26 @@ function LecturerDashboard() {
   const [sessionMessage, setSessionMessage] = useState("");
 
   // =========================
-  // ATTENDANCE DETAILS
+  // SESSION ATTENDANCE
   // =========================
 
   const [selectedSession, setSelectedSession] = useState(null);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceSummary, setAttendanceSummary] = useState(null);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
+
+  // =========================
+  // COURSE ANALYTICS
+  // =========================
+
+  const [selectedCourseAnalytics, setSelectedCourseAnalytics] =
+    useState(null);
+
+  const [courseAnalytics, setCourseAnalytics] =
+    useState(null);
+
+  const [loadingCourseAnalytics, setLoadingCourseAnalytics] =
+    useState(false);
 
   // =========================
   // MESSAGES
@@ -60,13 +73,11 @@ function LecturerDashboard() {
       );
 
       setCourses(response.data.courses || []);
-
     } catch (err) {
       setError(
         err.response?.data?.message ||
         "Failed to load courses."
       );
-
     } finally {
       setLoadingCourses(false);
     }
@@ -88,13 +99,11 @@ function LecturerDashboard() {
       );
 
       setSessions(response.data.sessions || []);
-
     } catch (err) {
       setError(
         err.response?.data?.message ||
         "Failed to load attendance sessions."
       );
-
     } finally {
       setLoadingSessions(false);
     }
@@ -139,7 +148,6 @@ function LecturerDashboard() {
       setCourseName("");
 
       fetchCourses();
-
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -161,6 +169,7 @@ function LecturerDashboard() {
       setSessionMessage(
         "Geolocation is not supported by this browser."
       );
+
       return;
     }
 
@@ -179,12 +188,11 @@ function LecturerDashboard() {
             "metres"
           );
 
-          // Prevent creation using poor lecturer coordinates
-          if (accuracy > 50) {
+          if (accuracy > 150) {
             setSessionMessage(
               `Your current location is only accurate to about ${Math.round(
                 accuracy
-              )} metres. Please wait a few seconds and try again.`
+              )} metres. Please move to an area with better GPS accuracy and try again.`
             );
 
             return;
@@ -198,7 +206,6 @@ function LecturerDashboard() {
           const startTime =
             now.toTimeString().split(" ")[0];
 
-          // Temporary default lecture duration: 90 minutes
           const endDate = new Date(
             now.getTime() + 90 * 60 * 1000
           );
@@ -230,7 +237,6 @@ function LecturerDashboard() {
           );
 
           fetchSessions();
-
         } catch (err) {
           setSessionMessage(
             err.response?.data?.message ||
@@ -309,6 +315,14 @@ function LecturerDashboard() {
 
       fetchSessions();
 
+      if (
+        selectedCourseAnalytics &&
+        courseAnalytics
+      ) {
+        handleViewCourseAnalytics(
+          selectedCourseAnalytics
+        );
+      }
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -330,26 +344,28 @@ function LecturerDashboard() {
     setError("");
 
     try {
-      const [attendanceResponse, summaryResponse] =
-        await Promise.all([
-          axios.get(
-            `/api/attendance/session/${session.id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
+      const [
+        attendanceResponse,
+        summaryResponse
+      ] = await Promise.all([
+        axios.get(
+          `/api/attendance/session/${session.id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
             }
-          ),
+          }
+        ),
 
-          axios.get(
-            `/api/attendance/session/${session.id}/summary`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`
-              }
+        axios.get(
+          `/api/attendance/session/${session.id}/summary`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
             }
-          )
-        ]);
+          }
+        )
+      ]);
 
       setAttendanceRecords(
         attendanceResponse.data.attendance ||
@@ -361,26 +377,67 @@ function LecturerDashboard() {
         summaryResponse.data.summary ||
         summaryResponse.data
       );
-
     } catch (err) {
       setError(
         err.response?.data?.message ||
         "Failed to retrieve session attendance."
       );
-
     } finally {
       setLoadingAttendance(false);
     }
   };
 
   // =========================
-  // CLOSE ATTENDANCE DETAILS
+  // CLOSE ATTENDANCE VIEW
   // =========================
 
   const handleCloseAttendanceDetails = () => {
     setSelectedSession(null);
     setAttendanceRecords([]);
     setAttendanceSummary(null);
+  };
+
+  // =========================
+  // VIEW COURSE ANALYTICS
+  // =========================
+
+  const handleViewCourseAnalytics = async (course) => {
+    setSelectedCourseAnalytics(course);
+    setCourseAnalytics(null);
+    setLoadingCourseAnalytics(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await axios.get(
+        `/api/attendance/course/${course.id}/stats`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      setCourseAnalytics(
+        response.data.statistics || null
+      );
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+        "Failed to retrieve course analytics."
+      );
+    } finally {
+      setLoadingCourseAnalytics(false);
+    }
+  };
+
+  // =========================
+  // CLOSE COURSE ANALYTICS
+  // =========================
+
+  const handleCloseCourseAnalytics = () => {
+    setSelectedCourseAnalytics(null);
+    setCourseAnalytics(null);
   };
 
   // =========================
@@ -462,11 +519,12 @@ function LecturerDashboard() {
 
         </section>
 
-        {/* STATS */}
+        {/* DASHBOARD STATS */}
 
         <section className="stats-grid">
 
           <div className="stat-card">
+
             <span className="stat-label">
               My Courses
             </span>
@@ -478,9 +536,11 @@ function LecturerDashboard() {
             <span className="stat-description">
               Assigned courses
             </span>
+
           </div>
 
           <div className="stat-card">
+
             <span className="stat-label">
               Total Sessions
             </span>
@@ -492,9 +552,11 @@ function LecturerDashboard() {
             <span className="stat-description">
               Attendance sessions created
             </span>
+
           </div>
 
           <div className="stat-card">
+
             <span className="stat-label">
               Active Sessions
             </span>
@@ -506,9 +568,11 @@ function LecturerDashboard() {
             <span className="stat-description">
               Sessions currently open
             </span>
+
           </div>
 
           <div className="stat-card">
+
             <span className="stat-label">
               Closed Sessions
             </span>
@@ -520,6 +584,7 @@ function LecturerDashboard() {
             <span className="stat-description">
               Completed attendance sessions
             </span>
+
           </div>
 
         </section>
@@ -529,7 +594,9 @@ function LecturerDashboard() {
         {message && (
           <div
             className="success-message"
-            style={{ marginBottom: "20px" }}
+            style={{
+              marginBottom: "20px"
+            }}
           >
             {message}
           </div>
@@ -538,7 +605,9 @@ function LecturerDashboard() {
         {error && (
           <div
             className="error-message"
-            style={{ marginBottom: "20px" }}
+            style={{
+              marginBottom: "20px"
+            }}
           >
             {error}
           </div>
@@ -549,6 +618,7 @@ function LecturerDashboard() {
         <section className="content-card">
 
           <div className="section-header">
+
             <div>
               <h2>
                 Create Course
@@ -558,6 +628,7 @@ function LecturerDashboard() {
                 Add a course to your lecturer account.
               </p>
             </div>
+
           </div>
 
           <form onSubmit={handleCreateCourse}>
@@ -565,6 +636,7 @@ function LecturerDashboard() {
             <div className="form-grid">
 
               <div className="form-group">
+
                 <label>
                   Course Code
                 </label>
@@ -578,9 +650,11 @@ function LecturerDashboard() {
                   placeholder="Example: CSC4035"
                   required
                 />
+
               </div>
 
               <div className="form-group">
+
                 <label>
                   Course Name
                 </label>
@@ -594,11 +668,16 @@ function LecturerDashboard() {
                   placeholder="Enter course name"
                   required
                 />
+
               </div>
 
             </div>
 
-            <div style={{ marginTop: "20px" }}>
+            <div
+              style={{
+                marginTop: "20px"
+              }}
+            >
               <button
                 className="primary-button"
                 type="submit"
@@ -616,18 +695,23 @@ function LecturerDashboard() {
         <section className="content-card">
 
           <div className="section-header">
+
             <div>
+
               <h2>
                 My Courses
               </h2>
 
               <p className="muted-text">
-                Start an attendance session for a course.
+                Start attendance or view course analytics.
               </p>
+
             </div>
+
           </div>
 
           {loadingCourses ? (
+
             <p className="muted-text">
               Loading courses...
             </p>
@@ -635,6 +719,7 @@ function LecturerDashboard() {
           ) : courses.length === 0 ? (
 
             <div className="empty-state">
+
               <h3>
                 No courses found
               </h3>
@@ -642,6 +727,7 @@ function LecturerDashboard() {
               <p>
                 Your assigned courses will appear here.
               </p>
+
             </div>
 
           ) : (
@@ -649,12 +735,14 @@ function LecturerDashboard() {
             <div className="course-grid">
 
               {courses.map((course) => (
+
                 <div
                   className="course-card"
                   key={course.id}
                 >
 
                   <div>
+
                     <span className="course-code">
                       {course.course_code}
                     </span>
@@ -666,28 +754,321 @@ function LecturerDashboard() {
                     <p className="muted-text">
                       Course ID: {course.id}
                     </p>
+
                   </div>
 
-                  <button
-                    className="primary-button"
-                    onClick={() =>
-                      handleStartAttendance(course.id)
-                    }
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      flexWrap: "wrap"
+                    }}
                   >
-                    Start Attendance
-                  </button>
+
+                    <button
+                      className="primary-button"
+                      onClick={() =>
+                        handleStartAttendance(
+                          course.id
+                        )
+                      }
+                    >
+                      Start Attendance
+                    </button>
+
+                    <button
+                      className="secondary-button"
+                      onClick={() =>
+                        handleViewCourseAnalytics(
+                          course
+                        )
+                      }
+                    >
+                      View Analytics
+                    </button>
+
+                  </div>
 
                 </div>
+
               ))}
 
             </div>
+
           )}
 
         </section>
 
+        {/* COURSE ANALYTICS */}
+
+        {selectedCourseAnalytics && (
+
+          <section className="content-card">
+
+            <div className="section-header">
+
+              <div>
+
+                <h2>
+                  Course Analytics
+                </h2>
+
+                <p className="muted-text">
+                  {selectedCourseAnalytics.course_code}
+                  {" — "}
+                  {selectedCourseAnalytics.course_name}
+                </p>
+
+              </div>
+
+              <button
+                className="secondary-button"
+                onClick={
+                  handleCloseCourseAnalytics
+                }
+              >
+                Close View
+              </button>
+
+            </div>
+
+            {loadingCourseAnalytics ? (
+
+              <p className="muted-text">
+                Loading course analytics...
+              </p>
+
+            ) : !courseAnalytics ? (
+
+              <div className="empty-state">
+
+                <h3>
+                  No analytics available
+                </h3>
+
+                <p>
+                  No attendance statistics are
+                  available for this course yet.
+                </p>
+
+              </div>
+
+            ) : (
+
+              <>
+
+                <div
+                  className="stats-grid"
+                  style={{
+                    marginBottom: "25px"
+                  }}
+                >
+
+                  <div className="stat-card">
+
+                    <span className="stat-label">
+                      Enrolled Students
+                    </span>
+
+                    <strong className="stat-value">
+                      {
+                        courseAnalytics
+                          .total_enrolled ?? 0
+                      }
+                    </strong>
+
+                    <span className="stat-description">
+                      Students registered for this course
+                    </span>
+
+                  </div>
+
+                  <div className="stat-card">
+
+                    <span className="stat-label">
+                      Total Sessions
+                    </span>
+
+                    <strong className="stat-value">
+                      {
+                        courseAnalytics
+                          .total_sessions ?? 0
+                      }
+                    </strong>
+
+                    <span className="stat-description">
+                      Attendance sessions created
+                    </span>
+
+                  </div>
+
+                  <div className="stat-card">
+
+                    <span className="stat-label">
+                      Average Attendance
+                    </span>
+
+                    <strong className="stat-value">
+                      {
+                        courseAnalytics
+                          .average_attendance_percentage ??
+                        0
+                      }
+                      %
+                    </strong>
+
+                    <span className="stat-description">
+                      Average across all sessions
+                    </span>
+
+                  </div>
+
+                  <div className="stat-card">
+
+                    <span className="stat-label">
+                      Course
+                    </span>
+
+                    <strong
+                      className="stat-value"
+                      style={{
+                        fontSize: "22px"
+                      }}
+                    >
+                      {
+                        courseAnalytics.course_code ||
+                        selectedCourseAnalytics
+                          .course_code
+                      }
+                    </strong>
+
+                    <span className="stat-description">
+                      {
+                        courseAnalytics.course_name ||
+                        selectedCourseAnalytics
+                          .course_name
+                      }
+                    </span>
+
+                  </div>
+
+                </div>
+
+                {!courseAnalytics.sessions ||
+                courseAnalytics.sessions.length === 0 ? (
+
+                  <div className="empty-state">
+
+                    <h3>
+                      No lecture sessions
+                    </h3>
+
+                    <p>
+                      Create attendance sessions to
+                      begin generating analytics.
+                    </p>
+
+                  </div>
+
+                ) : (
+
+                  <div className="table-wrapper">
+
+                    <table className="dashboard-table">
+
+                      <thead>
+
+                        <tr>
+                          <th>Session</th>
+                          <th>Date</th>
+                          <th>Present</th>
+                          <th>Absent</th>
+                          <th>Attendance Rate</th>
+                        </tr>
+
+                      </thead>
+
+                      <tbody>
+
+                        {courseAnalytics.sessions.map(
+                          (session, index) => (
+
+                            <tr
+                              key={
+                                session.session_id ||
+                                index
+                              }
+                            >
+
+                              <td>
+                                #
+                                {
+                                  session.session_id
+                                }
+                              </td>
+
+                              <td>
+
+                                {session.session_date
+                                  ? new Date(
+                                      session.session_date
+                                    ).toLocaleDateString()
+                                  : "N/A"}
+
+                              </td>
+
+                              <td>
+                                {
+                                  session.total_present ??
+                                  0
+                                }
+                              </td>
+
+                              <td>
+                                {
+                                  session.total_absent ??
+                                  0
+                                }
+                              </td>
+
+                              <td>
+
+                                <strong>
+                                  {
+                                    session
+                                      .attendance_percentage ??
+                                    0
+                                  }
+                                  %
+                                </strong>
+
+                              </td>
+
+                            </tr>
+
+                          )
+                        )}
+
+                      </tbody>
+
+                    </table>
+
+                  </div>
+
+                )}
+
+              </>
+
+            )}
+
+          </section>
+
+        )}
+
         {/* SESSION MESSAGE */}
 
         {sessionMessage && (
+
           <div
             className={
               sessionMessage
@@ -696,20 +1077,25 @@ function LecturerDashboard() {
                 ? "success-message"
                 : "info-box"
             }
-            style={{ marginBottom: "20px" }}
+            style={{
+              marginBottom: "20px"
+            }}
           >
             {sessionMessage}
           </div>
+
         )}
 
         {/* ACTIVE QR */}
 
         {sessionData && (
+
           <section className="content-card">
 
             <div className="section-header">
 
               <div>
+
                 <h2>
                   Active Attendance Session
                 </h2>
@@ -717,6 +1103,7 @@ function LecturerDashboard() {
                 <p className="muted-text">
                   Students should scan this QR code.
                 </p>
+
               </div>
 
               <span className="status-badge status-present">
@@ -740,6 +1127,7 @@ function LecturerDashboard() {
               <div className="session-details">
 
                 <div className="detail-row">
+
                   <span>
                     Session ID
                   </span>
@@ -747,9 +1135,11 @@ function LecturerDashboard() {
                   <strong>
                     {sessionData.session.id}
                   </strong>
+
                 </div>
 
                 <div className="detail-row">
+
                   <span>
                     Course ID
                   </span>
@@ -757,9 +1147,11 @@ function LecturerDashboard() {
                   <strong>
                     {sessionData.session.course_id}
                   </strong>
+
                 </div>
 
                 <div className="detail-row">
+
                   <span>
                     Allowed Radius
                   </span>
@@ -767,9 +1159,11 @@ function LecturerDashboard() {
                   <strong>
                     {sessionData.session.allowed_radius}m
                   </strong>
+
                 </div>
 
                 <div className="detail-row">
+
                   <span>
                     QR Expires
                   </span>
@@ -779,6 +1173,7 @@ function LecturerDashboard() {
                       sessionData.session.qr_expires_at
                     ).toLocaleTimeString()}
                   </strong>
+
                 </div>
 
                 <button
@@ -797,6 +1192,7 @@ function LecturerDashboard() {
             </div>
 
           </section>
+
         )}
 
         {/* SESSION HISTORY */}
@@ -806,6 +1202,7 @@ function LecturerDashboard() {
           <div className="section-header">
 
             <div>
+
               <h2>
                 Attendance Sessions
               </h2>
@@ -813,11 +1210,13 @@ function LecturerDashboard() {
               <p className="muted-text">
                 View and manage previous lecture sessions.
               </p>
+
             </div>
 
           </div>
 
           {loadingSessions ? (
+
             <p className="muted-text">
               Loading sessions...
             </p>
@@ -825,6 +1224,7 @@ function LecturerDashboard() {
           ) : sessions.length === 0 ? (
 
             <div className="empty-state">
+
               <h3>
                 No sessions found
               </h3>
@@ -833,6 +1233,7 @@ function LecturerDashboard() {
                 Attendance sessions will appear here
                 after you create one.
               </p>
+
             </div>
 
           ) : (
@@ -842,6 +1243,7 @@ function LecturerDashboard() {
               <table className="dashboard-table">
 
                 <thead>
+
                   <tr>
                     <th>Course</th>
                     <th>Date</th>
@@ -849,6 +1251,7 @@ function LecturerDashboard() {
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
+
                 </thead>
 
                 <tbody>
@@ -859,9 +1262,11 @@ function LecturerDashboard() {
                       Number(session.is_active) === 1;
 
                     return (
+
                       <tr key={session.id}>
 
                         <td>
+
                           <span className="course-code">
                             {session.course_code}
                           </span>
@@ -869,23 +1274,31 @@ function LecturerDashboard() {
                           {" "}
 
                           {session.course_name}
+
                         </td>
 
                         <td>
+
                           {session.session_date
                             ? new Date(
                                 session.session_date
                               ).toLocaleDateString()
                             : "N/A"}
+
                         </td>
 
                         <td>
+
                           {session.start_time}
+
                           {" - "}
+
                           {session.end_time}
+
                         </td>
 
                         <td>
+
                           <span
                             className={
                               isActive
@@ -897,9 +1310,11 @@ function LecturerDashboard() {
                               ? "Active"
                               : "Closed"}
                           </span>
+
                         </td>
 
                         <td>
+
                           <div
                             style={{
                               display: "flex",
@@ -920,6 +1335,7 @@ function LecturerDashboard() {
                             </button>
 
                             {isActive && (
+
                               <button
                                 className="danger-button"
                                 onClick={() =>
@@ -930,12 +1346,15 @@ function LecturerDashboard() {
                               >
                                 Close
                               </button>
+
                             )}
 
                           </div>
+
                         </td>
 
                       </tr>
+
                     );
                   })}
 
@@ -944,18 +1363,21 @@ function LecturerDashboard() {
               </table>
 
             </div>
+
           )}
 
         </section>
 
-        {/* ATTENDANCE DETAILS */}
+        {/* SESSION ATTENDANCE */}
 
         {selectedSession && (
+
           <section className="content-card">
 
             <div className="section-header">
 
               <div>
+
                 <h2>
                   Session Attendance
                 </h2>
@@ -965,6 +1387,7 @@ function LecturerDashboard() {
                   {" — "}
                   {selectedSession.course_name}
                 </p>
+
               </div>
 
               <button
@@ -987,9 +1410,11 @@ function LecturerDashboard() {
             ) : (
 
               <>
+
                 {/* SUMMARY */}
 
                 {attendanceSummary && (
+
                   <div
                     className="stats-grid"
                     style={{
@@ -998,53 +1423,69 @@ function LecturerDashboard() {
                   >
 
                     <div className="stat-card">
+
                       <span className="stat-label">
                         Enrolled
                       </span>
 
                       <strong className="stat-value">
-                        {attendanceSummary.total_enrolled ??
-                          attendanceSummary.totalEnrolled ??
-                          0}
+                        {
+                          attendanceSummary
+                            .total_enrolled ?? 0
+                        }
                       </strong>
+
                     </div>
 
                     <div className="stat-card">
+
                       <span className="stat-label">
                         Present
                       </span>
 
                       <strong className="stat-value">
-                        {attendanceSummary.present ??
-                          0}
+                        {
+                          attendanceSummary
+                            .total_present ?? 0
+                        }
                       </strong>
+
                     </div>
 
                     <div className="stat-card">
+
                       <span className="stat-label">
                         Absent
                       </span>
 
                       <strong className="stat-value">
-                        {attendanceSummary.absent ??
-                          0}
+                        {
+                          attendanceSummary
+                            .total_absent ?? 0
+                        }
                       </strong>
+
                     </div>
 
                     <div className="stat-card">
+
                       <span className="stat-label">
                         Attendance
                       </span>
 
                       <strong className="stat-value">
-                        {attendanceSummary.attendance_percentage ??
-                          attendanceSummary.percentage ??
-                          0}
+                        {
+                          attendanceSummary
+                            .attendance_percentage ??
+                          0
+                        }
                         %
                       </strong>
+
                     </div>
 
                   </div>
+
                 )}
 
                 {/* ATTENDANCE TABLE */}
@@ -1052,6 +1493,7 @@ function LecturerDashboard() {
                 {attendanceRecords.length === 0 ? (
 
                   <div className="empty-state">
+
                     <h3>
                       No attendance recorded
                     </h3>
@@ -1060,6 +1502,7 @@ function LecturerDashboard() {
                       No students have marked attendance
                       for this session yet.
                     </p>
+
                   </div>
 
                 ) : (
@@ -1069,6 +1512,7 @@ function LecturerDashboard() {
                     <table className="dashboard-table">
 
                       <thead>
+
                         <tr>
                           <th>Student</th>
                           <th>Student Number</th>
@@ -1076,12 +1520,14 @@ function LecturerDashboard() {
                           <th>Distance</th>
                           <th>Status</th>
                         </tr>
+
                       </thead>
 
                       <tbody>
 
                         {attendanceRecords.map(
                           (record, index) => (
+
                             <tr
                               key={
                                 record.id ||
@@ -1090,41 +1536,62 @@ function LecturerDashboard() {
                             >
 
                               <td>
+
                                 <strong>
-                                  {record.full_name ||
+                                  {
+                                    record.full_name ||
                                     record.student_name ||
-                                    "N/A"}
+                                    "N/A"
+                                  }
                                 </strong>
+
                               </td>
 
                               <td>
-                                {record.student_number ||
-                                  "N/A"}
+                                {
+                                  record.student_number ||
+                                  "N/A"
+                                }
                               </td>
 
                               <td>
+
                                 {record.scan_time
                                   ? new Date(
                                       record.scan_time
                                     ).toLocaleTimeString()
                                   : "N/A"}
+
                               </td>
 
                               <td>
-                                {record.distance_from_lecturer ??
+
+                                {
+                                  record
+                                    .distance_from_lecturer ??
                                   record.distance ??
-                                  "N/A"}
+                                  "N/A"
+                                }
+
                                 {" m"}
+
                               </td>
 
                               <td>
+
                                 <span className="status-badge status-present">
-                                  {record.status ||
-                                    "Present"}
+
+                                  {
+                                    record.status ||
+                                    "Present"
+                                  }
+
                                 </span>
+
                               </td>
 
                             </tr>
+
                           )
                         )}
 
@@ -1133,11 +1600,15 @@ function LecturerDashboard() {
                     </table>
 
                   </div>
+
                 )}
+
               </>
+
             )}
 
           </section>
+
         )}
 
       </main>
