@@ -397,13 +397,7 @@ function LecturerCourses() {
           </div>
 
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "minmax(260px, 330px) 1fr",
-              gap: "40px",
-              alignItems: "center"
-            }}
+            className="qr-session-layout"
           >
 
             <div
