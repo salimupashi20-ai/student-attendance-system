@@ -9,40 +9,68 @@ import Login from "./pages/Login";
 
 import StudentScan from "./pages/StudentScan";
 
-import ProtectedRoute from "./components/ProtectedRoute";
+import LecturerMobileLocation
+  from "./pages/LecturerMobileLocation";
+
+import ProtectedRoute
+  from "./components/ProtectedRoute";
 
 // =========================
 // ADMIN
 // =========================
 
-import AdminLayout from "./layouts/AdminLayout";
+import AdminLayout
+  from "./layouts/AdminLayout";
 
-import AdminOverview from "./pages/admin/AdminOverview";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminCourses from "./pages/admin/AdminCourses";
-import AdminEnrollments from "./pages/admin/AdminEnrollments";
-import AdminAttendance from "./pages/admin/AdminAttendance";
+import AdminOverview
+  from "./pages/admin/AdminOverview";
+
+import AdminUsers
+  from "./pages/admin/AdminUsers";
+
+import AdminCourses
+  from "./pages/admin/AdminCourses";
+
+import AdminEnrollments
+  from "./pages/admin/AdminEnrollments";
+
+import AdminAttendance
+  from "./pages/admin/AdminAttendance";
 
 // =========================
 // LECTURER
 // =========================
 
-import LecturerLayout from "./layouts/LecturerLayout";
+import LecturerLayout
+  from "./layouts/LecturerLayout";
 
-import LecturerOverview from "./pages/lecturer/LecturerOverview";
-import LecturerCourses from "./pages/lecturer/LecturerCourses";
-import LecturerSessions from "./pages/lecturer/LecturerSessions";
-import LecturerAnalytics from "./pages/lecturer/LecturerAnalytics";
+import LecturerOverview
+  from "./pages/lecturer/LecturerOverview";
+
+import LecturerCourses
+  from "./pages/lecturer/LecturerCourses";
+
+import LecturerSessions
+  from "./pages/lecturer/LecturerSessions";
+
+import LecturerAnalytics
+  from "./pages/lecturer/LecturerAnalytics";
 
 // =========================
 // STUDENT
 // =========================
 
-import StudentLayout from "./layouts/StudentLayout";
+import StudentLayout
+  from "./layouts/StudentLayout";
 
-import StudentOverview from "./pages/student/StudentOverview";
-import StudentCourses from "./pages/student/StudentCourses";
-import StudentAttendance from "./pages/student/StudentAttendance";
+import StudentOverview
+  from "./pages/student/StudentOverview";
+
+import StudentCourses
+  from "./pages/student/StudentCourses";
+
+import StudentAttendance
+  from "./pages/student/StudentAttendance";
 
 function App() {
   return (
@@ -50,7 +78,9 @@ function App() {
 
       <Routes>
 
-        {/* DEFAULT */}
+        {/* =========================
+            DEFAULT
+        ========================= */}
 
         <Route
           path="/"
@@ -62,12 +92,36 @@ function App() {
           }
         />
 
-        {/* LOGIN */}
+
+        {/* =========================
+            LOGIN
+        ========================= */}
 
         <Route
           path="/login"
           element={<Login />}
         />
+
+
+        {/* =========================
+            PUBLIC LECTURER
+            MOBILE LOCATION PAGE
+
+            This is intentionally not
+            behind ProtectedRoute.
+
+            Security is provided by the
+            random, short-lived setup
+            token in the QR URL.
+        ========================= */}
+
+        <Route
+          path="/lecturer/mobile-location"
+          element={
+            <LecturerMobileLocation />
+          }
+        />
+
 
         {/* =========================
             STUDENT
@@ -77,7 +131,9 @@ function App() {
           path="/student"
           element={
             <ProtectedRoute
-              allowedRoles={["student"]}
+              allowedRoles={[
+                "student"
+              ]}
             >
               <StudentLayout />
             </ProtectedRoute>
@@ -117,21 +173,22 @@ function App() {
 
         </Route>
 
-        {/* IMPORTANT:
-            QR scan remains separate
-            so the scan URL works directly
-        */}
+
+        {/* STUDENT QR SCAN */}
 
         <Route
           path="/student/scan"
           element={
             <ProtectedRoute
-              allowedRoles={["student"]}
+              allowedRoles={[
+                "student"
+              ]}
             >
               <StudentScan />
             </ProtectedRoute>
           }
         />
+
 
         {/* =========================
             LECTURER
@@ -141,7 +198,9 @@ function App() {
           path="/lecturer"
           element={
             <ProtectedRoute
-              allowedRoles={["lecturer"]}
+              allowedRoles={[
+                "lecturer"
+              ]}
             >
               <LecturerLayout />
             </ProtectedRoute>
@@ -188,6 +247,7 @@ function App() {
 
         </Route>
 
+
         {/* =========================
             ADMIN
         ========================= */}
@@ -196,7 +256,9 @@ function App() {
           path="/admin"
           element={
             <ProtectedRoute
-              allowedRoles={["admin"]}
+              allowedRoles={[
+                "admin"
+              ]}
             >
               <AdminLayout />
             </ProtectedRoute>
@@ -250,7 +312,10 @@ function App() {
 
         </Route>
 
-        {/* FALLBACK */}
+
+        {/* =========================
+            FALLBACK
+        ========================= */}
 
         <Route
           path="*"
