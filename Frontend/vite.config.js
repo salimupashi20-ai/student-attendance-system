@@ -2,22 +2,41 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import fs from "fs";
 
-export default defineConfig({
-  plugins: [react()],
+export default defineConfig(({ command }) => {
+  const isDevelopment =
+    command === "serve";
 
-  server: {
-    host: "0.0.0.0",
+  return {
+    plugins: [
+      react()
+    ],
 
-    https: {
-      key: fs.readFileSync("./certs/dev-key.pem"),
-      cert: fs.readFileSync("./certs/dev-cert.pem")
-    },
+    server: isDevelopment
+      ? {
+          host: "0.0.0.0",
+          port: 5173,
 
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:5000",
-        changeOrigin: true
-      }
-    }
-  }
+          https: {
+            key: fs.readFileSync(
+              "./certs/dev-key.pem"
+            ),
+
+            cert: fs.readFileSync(
+              "./certs/dev-cert.pem"
+            )
+          },
+
+          proxy: {
+            "/api": {
+              target:
+                "http://127.0.0.1:5000",
+
+              changeOrigin: true,
+
+              secure: false
+            }
+          }
+        }
+      : undefined
+  };
 });
