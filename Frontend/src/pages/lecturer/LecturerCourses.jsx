@@ -27,6 +27,11 @@ function LecturerCourses() {
   const [activeSession, setActiveSession] =
     useState(null);
 
+  // The backend is the source of truth for whether
+  // an attendance session is still active.
+  const [serverActiveSession, setServerActiveSession] =
+    useState(null);
+
   const [message, setMessage] =
     useState("");
 
@@ -71,46 +76,67 @@ function LecturerCourses() {
   };
 
   // =========================================
-  // RESTORE ACTIVE ATTENDANCE QR
+  // RESTORE ACTIVE ATTENDANCE QR FROM SERVER
   // =========================================
 
-  useEffect(() => {
-    const saved =
-      localStorage.getItem(
-        "lecturerActiveSession"
-      );
+  const fetchActiveSession =
+    async (showQr = true) => {
 
-    if (!saved) {
-      return;
-    }
+      try {
+        const response =
+          await axios.get(
+            "/api/sessions/active",
+            authHeaders
+          );
 
-    try {
-      const parsed =
-        JSON.parse(saved);
+        const session =
+          response.data.activeSession;
 
-      const expiry =
-        parsed.qr_expires_at
-          ? new Date(
-              parsed.qr_expires_at
-            )
-          : null;
+        if (!session) {
+          setServerActiveSession(null);
 
-      if (
-        !expiry ||
-        expiry > new Date()
-      ) {
-        setActiveSession(parsed);
-      } else {
-        localStorage.removeItem(
-          "lecturerActiveSession"
+          if (showQr) {
+            setActiveSession(null);
+          }
+
+          localStorage.removeItem(
+            "lecturerActiveSession"
+          );
+
+          return null;
+        }
+
+        setServerActiveSession(
+          session
         );
-      }
 
-    } catch {
-      localStorage.removeItem(
-        "lecturerActiveSession"
-      );
-    }
+        if (showQr) {
+          setActiveSession(
+            session
+          );
+
+          localStorage.setItem(
+            "lecturerActiveSession",
+            JSON.stringify(
+              session
+            )
+          );
+        }
+
+        return session;
+
+      } catch (err) {
+        console.error(
+          "FAILED TO RESTORE ACTIVE SESSION:",
+          err
+        );
+
+        return null;
+      }
+    };
+
+  useEffect(() => {
+    fetchActiveSession(true);
   }, []);
 
   // =========================================
@@ -464,6 +490,10 @@ function LecturerCourses() {
       };
 
       setActiveSession(
+        newActiveSession
+      );
+
+      setServerActiveSession(
         newActiveSession
       );
 
@@ -1159,6 +1189,9 @@ function LecturerCourses() {
   const handleDismissSession =
     () => {
 
+      // Only hide the QR visually.
+      // The attendance session remains active
+      // on the backend until it expires or is closed.
       setActiveSession(
         null
       );
@@ -1166,6 +1199,45 @@ function LecturerCourses() {
       localStorage.removeItem(
         "lecturerActiveSession"
       );
+
+      setMessage(
+        "QR code hidden. The attendance session is still active."
+      );
+
+      setError("");
+    };
+
+  // =========================================
+  // SHOW ACTIVE QR AGAIN
+  // =========================================
+
+  const handleShowActiveQr =
+    async () => {
+
+      setMessage("");
+      setError("");
+
+      try {
+        const session =
+          await fetchActiveSession(true);
+
+        if (!session) {
+          setError(
+            "There is no active attendance QR code to display."
+          );
+
+          return;
+        }
+
+        setMessage(
+          "Active attendance QR restored successfully."
+        );
+
+      } catch {
+        setError(
+          "Failed to restore the active QR code."
+        );
+      }
     };
 
   return (
@@ -1522,6 +1594,85 @@ function LecturerCourses() {
               </div>
 
             </div>
+
+          </div>
+
+        </section>
+
+      )}
+
+
+      {/* =====================================
+          HIDDEN BUT STILL ACTIVE QR
+      ===================================== */}
+
+      {serverActiveSession &&
+       !activeSession && (
+
+        <section className="content-card">
+
+          <div className="section-header">
+
+            <div>
+
+              <h2>
+                Active Attendance Session
+              </h2>
+
+              <p className="muted-text">
+                {serverActiveSession.course_code}
+                {" — "}
+                {serverActiveSession.course_name}
+              </p>
+
+            </div>
+
+            <span className="status-badge status-present">
+              Active
+            </span>
+
+          </div>
+
+          <p className="muted-text">
+            This attendance session is still active,
+            but its QR code is currently hidden.
+          </p>
+
+          {serverActiveSession.qr_expires_at && (
+
+            <p>
+              <strong>
+                QR Expires:
+              </strong>{" "}
+
+              {new Date(
+                serverActiveSession.qr_expires_at
+              ).toLocaleTimeString(
+                [],
+                {
+                  hour: "2-digit",
+                  minute: "2-digit"
+                }
+              )}
+            </p>
+
+          )}
+
+          <div
+            style={{
+              marginTop: "20px"
+            }}
+          >
+
+            <button
+              type="button"
+              className="primary-button"
+              onClick={
+                handleShowActiveQr
+              }
+            >
+              Show Active QR
+            </button>
 
           </div>
 
@@ -1921,8 +2072,8 @@ function LecturerCourses() {
                           type="button"
                           className="primary-button"
                           disabled={
-                            startingSession ===
-                            course.id
+                            startingSession === course.id ||
+                            Boolean(serverActiveSession)
                           }
                           onClick={() =>
                             handleStartAttendance(
@@ -1931,10 +2082,11 @@ function LecturerCourses() {
                           }
                         >
 
-                          {startingSession ===
-                          course.id
+                          {startingSession === course.id
                             ? "Checking Location..."
-                            : "Start Attendance"}
+                            : serverActiveSession
+                              ? "Session Already Active"
+                              : "Start Attendance"}
 
                         </button>
 
