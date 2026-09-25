@@ -17,7 +17,7 @@ function StudentDashboard() {
       <h1>Student Dashboard</h1>
 
       <p>
-        Welcome, {user?.full_name}
+        WELCOME, {user?.full_name}
       </p>
 
       <p>
