@@ -1,0 +1,751 @@
+/* =========================
+   PORTAL LAYOUT
+========================= */
+
+.portal-layout {
+  min-height: 100vh;
+
+  display: flex;
+
+  background: #f7f8f5;
+
+  color: #1f2933;
+}
+
+
+/* =========================
+   SIDEBAR
+========================= */
+
+.portal-sidebar {
+  width: 260px;
+
+  min-height: 100vh;
+
+  position: fixed;
+
+  left: 0;
+  top: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  background: #183f31;
+
+  color: #ffffff;
+
+  border-right: 1px solid
+    rgba(255, 255, 255, 0.08);
+
+  z-index: 100;
+}
+
+
+/* =========================
+   BRAND
+========================= */
+
+.sidebar-brand {
+  min-height: 92px;
+
+  padding: 22px 20px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-logo {
+  width: 44px;
+  height: 44px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 12px;
+
+  background: #d6a84b;
+
+  color: #183f31;
+
+  font-size: 14px;
+
+  font-weight: 800;
+
+  letter-spacing: 0.04em;
+}
+
+.sidebar-brand h2 {
+  margin: 0;
+
+  font-size: 17px;
+
+  color: #ffffff;
+}
+
+.sidebar-brand p {
+  margin: 3px 0 0;
+
+  font-size: 12px;
+
+  color: rgba(
+    255,
+    255,
+    255,
+    0.62
+  );
+}
+
+
+/* =========================
+   NAVIGATION
+========================= */
+
+.sidebar-navigation {
+  flex: 1;
+
+  padding: 22px 14px;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 7px;
+}
+
+.sidebar-link {
+  min-height: 46px;
+
+  padding: 0 14px;
+
+  display: flex;
+  align-items: center;
+
+  gap: 12px;
+
+  border-radius: 10px;
+
+  text-decoration: none;
+
+  color: rgba(
+    255,
+    255,
+    255,
+    0.72
+  );
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.sidebar-link:hover {
+  color: #ffffff;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.08
+    );
+}
+
+.sidebar-link.active {
+  background: #ffffff;
+
+  color: #183f31;
+
+  box-shadow:
+    0 8px 20px
+    rgba(
+      0,
+      0,
+      0,
+      0.08
+    );
+}
+
+.sidebar-link.active::before {
+  content: "";
+
+  width: 4px;
+  height: 22px;
+
+  position: absolute;
+
+  left: 0;
+
+  border-radius:
+    0 6px 6px 0;
+
+  background: #d6a84b;
+}
+
+.sidebar-icon {
+  width: 22px;
+
+  display: inline-flex;
+
+  justify-content: center;
+
+  font-size: 18px;
+}
+
+
+/* =========================
+   SIDEBAR FOOTER
+========================= */
+
+.sidebar-footer {
+  padding: 18px;
+
+  border-top: 1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.1
+    );
+}
+
+.sidebar-user {
+  display: flex;
+
+  align-items: center;
+
+  gap: 11px;
+
+  margin-bottom: 14px;
+}
+
+.sidebar-user-avatar {
+  width: 38px;
+  height: 38px;
+
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: #d6a84b;
+
+  color: #183f31;
+
+  font-weight: 800;
+}
+
+.sidebar-user-details {
+  min-width: 0;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 3px;
+}
+
+.sidebar-user-details strong {
+  overflow: hidden;
+
+  color: #ffffff;
+
+  font-size: 13px;
+
+  white-space: nowrap;
+
+  text-overflow: ellipsis;
+}
+
+.sidebar-user-details span {
+  color:
+    rgba(
+      255,
+      255,
+      255,
+      0.55
+    );
+
+  font-size: 11px;
+}
+
+.sidebar-logout {
+  width: 100%;
+
+  padding: 10px;
+
+  border:
+    1px solid
+    rgba(
+      255,
+      255,
+      255,
+      0.15
+    );
+
+  border-radius: 9px;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.06
+    );
+
+  color: #ffffff;
+
+  cursor: pointer;
+
+  font-weight: 600;
+
+  transition: 0.2s ease;
+}
+
+.sidebar-logout:hover {
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.12
+    );
+}
+
+
+/* =========================
+   MAIN AREA
+========================= */
+
+.portal-main {
+  width: calc(100% - 260px);
+
+  min-height: 100vh;
+
+  margin-left: 260px;
+}
+
+
+/* =========================
+   TOPBAR
+========================= */
+
+.portal-topbar {
+  min-height: 92px;
+
+  padding: 18px 34px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 20px;
+
+  position: sticky;
+
+  top: 0;
+
+  z-index: 50;
+
+  background:
+    rgba(
+      255,
+      255,
+      255,
+      0.96
+    );
+
+ -webkit-backdrop-filter: blur(10px);
+backdrop-filter: blur(10px);
+
+  border-bottom:
+    1px solid #e3e7e2;
+}
+
+.portal-topbar h1 {
+  margin: 0;
+
+  font-size: 19px;
+
+  color: #1f2933;
+}
+
+.portal-topbar p {
+  margin: 5px 0 0;
+
+  font-size: 12px;
+
+  color: #6b7280;
+}
+
+.portal-role {
+  padding: 7px 12px;
+
+  border-radius: 999px;
+
+  background: #f6e5b8;
+
+  border: 1px solid #e7c66f;
+
+  color: #745414;
+
+  font-size: 12px;
+
+  font-weight: 700;
+}
+
+
+/* =========================
+   CONTENT
+========================= */
+
+.portal-content {
+  width: 100%;
+
+  max-width: 1500px;
+
+  margin: 0 auto;
+
+  padding: 34px;
+}
+
+
+/* =========================
+   PAGE HEADER
+========================= */
+
+.page-heading {
+  margin-bottom: 28px;
+}
+
+.page-heading h1 {
+  margin: 0;
+
+  color: #1f2933;
+
+  font-size:
+    clamp(
+      28px,
+      4vw,
+      38px
+    );
+
+  letter-spacing:
+    -0.7px;
+}
+
+.page-heading p {
+  margin: 8px 0 0;
+
+  color: #6b7280;
+
+  line-height: 1.5;
+}
+
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 900px) {
+
+  .portal-sidebar {
+    width: 220px;
+  }
+
+  .portal-main {
+    width:
+      calc(
+        100% - 220px
+      );
+
+    margin-left: 220px;
+  }
+
+}
+
+
+@media (max-width: 700px) {
+
+  .portal-layout {
+    display: block;
+  }
+
+  .portal-sidebar {
+    width: 100%;
+
+
+    position: relative;
+  }
+
+
+  .sidebar-navigation {
+    display: grid;
+
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(
+          0,
+          1fr
+        )
+      );
+
+    padding: 14px;
+  }
+
+  .sidebar-link {
+    justify-content: center;
+  }
+
+  .sidebar-footer {
+    display: none;
+  }
+
+  .portal-main {
+    width: 100%;
+
+    margin-left: 0;
+  }
+
+  .portal-topbar {
+    padding:
+      16px 18px;
+  }
+
+  .portal-content {
+    padding:
+      24px 14px;
+  }
+
+}
+
+
+@media (max-width: 480px) {
+
+  .sidebar-navigation {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-role {
+    display: none;
+  }
+
+}
+
+/* ========================================
+   RESPONSIVE PORTAL LAYOUT
+======================================== */
+
+@media (max-width: 900px) {
+
+  .portal-layout {
+    display: block;
+    min-height: 100vh;
+  }
+
+  /* Turn sidebar into a compact top menu */
+  .portal-sidebar {
+    position: relative;
+    top: auto;
+    left: auto;
+
+    width: 100%;
+    height: auto;
+    min-height: 0;
+
+    display: block;
+
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+
+    overflow: visible;
+  }
+
+  /* Brand */
+  .sidebar-brand {
+    padding: 18px 20px;
+
+    display: flex;
+    align-items: center;
+
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar-brand h2 {
+    margin: 0;
+  }
+
+  .sidebar-brand p {
+    margin-top: 3px;
+  }
+
+  /* Navigation */
+  .sidebar-navigation {
+    display: grid;
+
+    grid-template-columns:
+      repeat(4, minmax(0, 1fr));
+
+    gap: 8px;
+
+    padding: 14px 18px;
+
+    margin: 0;
+
+    flex: none;
+  }
+
+  .sidebar-link {
+    width: 100%;
+
+    min-height: 46px;
+
+    padding: 10px 12px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 7px;
+
+    text-align: center;
+
+    margin: 0;
+  }
+
+  .sidebar-icon {
+    flex-shrink: 0;
+  }
+
+  /* Footer */
+  .sidebar-footer {
+    margin: 0;
+
+    padding: 14px 18px;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar-user {
+    margin: 0;
+
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+  }
+
+  .sidebar-logout {
+    width: auto;
+
+    min-width: 110px;
+
+    margin: 0;
+  }
+
+  /* Main content no longer needs sidebar offset */
+  .portal-main {
+    margin-left: 0;
+
+    width: 100%;
+    min-height: auto;
+  }
+
+  .portal-topbar {
+    padding: 18px 24px;
+  }
+
+  .portal-content {
+    padding: 24px;
+  }
+}
+
+
+/* ========================================
+   SMALL PHONES
+======================================== */
+
+@media (max-width: 600px) {
+
+  .sidebar-brand {
+    padding: 16px;
+  }
+
+  /* Two buttons per row */
+  .sidebar-navigation {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    padding: 12px;
+
+    gap: 8px;
+  }
+
+  .sidebar-link {
+    min-height: 44px;
+
+    font-size: 0.88rem;
+  }
+
+  /* User and logout stack */
+  .sidebar-footer {
+    flex-direction: column;
+
+    align-items: stretch;
+
+    gap: 12px;
+
+    padding: 14px;
+  }
+
+  .sidebar-user {
+    width: 100%;
+  }
+
+  .sidebar-logout {
+    width: 100%;
+  }
+
+  /* Header */
+  .portal-topbar {
+    padding: 16px;
+
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 10px;
+  }
+
+  .portal-role {
+    align-self: flex-start;
+  }
+
+  .portal-content {
+    padding: 14px;
+  }
+}

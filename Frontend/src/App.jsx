@@ -1,60 +1,334 @@
 import {
   BrowserRouter,
-  Routes,
+  Navigate,
   Route,
-  Navigate
+  Routes
 } from "react-router-dom";
 
 import Login from "./pages/Login";
-import StudentDashboard from "./pages/StudentDashboard";
-import LecturerDashboard from "./pages/LecturerDashboard";
-import ProtectedRoute from "./components/ProtectedRoute";
+
 import StudentScan from "./pages/StudentScan";
+
+import LecturerMobileLocation
+  from "./pages/LecturerMobileLocation";
+
+import ProtectedRoute
+  from "./components/ProtectedRoute";
+
+// =========================
+// ADMIN
+// =========================
+
+import AdminLayout
+  from "./layouts/AdminLayout";
+
+import AdminOverview
+  from "./pages/admin/AdminOverview";
+
+import AdminUsers
+  from "./pages/admin/AdminUsers";
+
+import AdminCourses
+  from "./pages/admin/AdminCourses";
+
+import AdminEnrollments
+  from "./pages/admin/AdminEnrollments";
+
+import AdminAttendance
+  from "./pages/admin/AdminAttendance";
+
+// =========================
+// LECTURER
+// =========================
+
+import LecturerLayout
+  from "./layouts/LecturerLayout";
+
+import LecturerOverview
+  from "./pages/lecturer/LecturerOverview";
+
+import LecturerCourses
+  from "./pages/lecturer/LecturerCourses";
+
+import LecturerSessions
+  from "./pages/lecturer/LecturerSessions";
+
+import LecturerAnalytics
+  from "./pages/lecturer/LecturerAnalytics";
+
+// =========================
+// STUDENT
+// =========================
+
+import StudentLayout
+  from "./layouts/StudentLayout";
+
+import StudentOverview
+  from "./pages/student/StudentOverview";
+
+import StudentCourses
+  from "./pages/student/StudentCourses";
+
+import StudentAttendance
+  from "./pages/student/StudentAttendance";
 
 function App() {
   return (
     <BrowserRouter>
+
       <Routes>
+
+        {/* =========================
+            DEFAULT
+        ========================= */}
+
+        <Route
+          path="/"
+          element={
+            <Navigate
+              to="/login"
+              replace
+            />
+          }
+        />
+
+
+        {/* =========================
+            LOGIN
+        ========================= */}
 
         <Route
           path="/login"
           element={<Login />}
         />
 
+
+        {/* =========================
+            PUBLIC LECTURER
+            MOBILE LOCATION PAGE
+
+            This is intentionally not
+            behind ProtectedRoute.
+
+            Security is provided by the
+            random, short-lived setup
+            token in the QR URL.
+        ========================= */}
+
         <Route
-          path="/student/dashboard"
+          path="/lecturer/mobile-location"
           element={
-            <ProtectedRoute allowedRole="student">
-              <StudentDashboard />
-            </ProtectedRoute>
+            <LecturerMobileLocation />
           }
         />
 
-        <Route
-          path="/lecturer/dashboard"
-          element={
-            <ProtectedRoute allowedRole="lecturer">
-              <LecturerDashboard />
-            </ProtectedRoute>
-          }
-        />
+
+        {/* =========================
+            STUDENT
+        ========================= */}
 
         <Route
-          path="/"
-          element={<Navigate to="/login" replace />}
-        />
+          path="/student"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                "student"
+              ]}
+            >
+              <StudentLayout />
+            </ProtectedRoute>
+          }
+        >
+
+          <Route
+            index
+            element={
+              <Navigate
+                to="/student/dashboard"
+                replace
+              />
+            }
+          />
+
+          <Route
+            path="dashboard"
+            element={
+              <StudentOverview />
+            }
+          />
+
+          <Route
+            path="courses"
+            element={
+              <StudentCourses />
+            }
+          />
+
+          <Route
+            path="attendance"
+            element={
+              <StudentAttendance />
+            }
+          />
+
+        </Route>
+
+
+        {/* STUDENT QR SCAN */}
 
         <Route
           path="/student/scan"
           element={
-            <ProtectedRoute allowedRole="student">
+            <ProtectedRoute
+              allowedRoles={[
+                "student"
+              ]}
+            >
               <StudentScan />
             </ProtectedRoute>
           }
         />
 
 
+        {/* =========================
+            LECTURER
+        ========================= */}
+
+        <Route
+          path="/lecturer"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                "lecturer"
+              ]}
+            >
+              <LecturerLayout />
+            </ProtectedRoute>
+          }
+        >
+
+          <Route
+            index
+            element={
+              <Navigate
+                to="/lecturer/dashboard"
+                replace
+              />
+            }
+          />
+
+          <Route
+            path="dashboard"
+            element={
+              <LecturerOverview />
+            }
+          />
+
+          <Route
+            path="courses"
+            element={
+              <LecturerCourses />
+            }
+          />
+
+          <Route
+            path="sessions"
+            element={
+              <LecturerSessions />
+            }
+          />
+
+          <Route
+            path="analytics"
+            element={
+              <LecturerAnalytics />
+            }
+          />
+
+        </Route>
+
+
+        {/* =========================
+            ADMIN
+        ========================= */}
+
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                "admin"
+              ]}
+            >
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+
+          <Route
+            index
+            element={
+              <Navigate
+                to="/admin/dashboard"
+                replace
+              />
+            }
+          />
+
+          <Route
+            path="dashboard"
+            element={
+              <AdminOverview />
+            }
+          />
+
+          <Route
+            path="users"
+            element={
+              <AdminUsers />
+            }
+          />
+
+          <Route
+            path="courses"
+            element={
+              <AdminCourses />
+            }
+          />
+
+          <Route
+            path="enrollments"
+            element={
+              <AdminEnrollments />
+            }
+          />
+
+          <Route
+            path="attendance"
+            element={
+              <AdminAttendance />
+            }
+          />
+
+        </Route>
+
+
+        {/* =========================
+            FALLBACK
+        ========================= */}
+
+        <Route
+          path="*"
+          element={
+            <Navigate
+              to="/login"
+              replace
+            />
+          }
+        />
+
       </Routes>
+
     </BrowserRouter>
   );
 }

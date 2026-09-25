@@ -8,7 +8,9 @@ async function testConnection() {
             host: process.env.DB_HOST,
             user: process.env.DB_USER,
             password: process.env.DB_PASSWORD,
-            database: 'student_attendance_system' // Ensure this matches your actual database name
+            database:
+                process.env.DB_NAME ||
+                "student_attendance_system" // Ensure this matches your actual database name
         });
 
         console.log('✅ Connection established successfully!');
