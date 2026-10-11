@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 
 const express = require("express");
@@ -6,7 +7,7 @@ const cors = require("cors");
 // Database connection
 require("./config/db");
 
-// Routes
+// Existing routes
 const authRoutes = require("./routes/authRoutes");
 const courseRoutes = require("./routes/courseRoutes");
 const enrollmentRoutes = require("./routes/enrollmentRoutes");
@@ -15,6 +16,9 @@ const attendanceRoutes = require("./routes/attendanceRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const locationRequestRoutes = require("./routes/locationRequestRoutes");
 
+// New Moodle integration routes
+const moodleRoutes = require("./routes/moodleRoutes");
+
 // Initialize Express
 const app = express();
 
@@ -22,7 +26,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Authentication routes
+// Existing API endpoints
 app.use("/api/auth", authRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/enrollments", enrollmentRoutes);
@@ -31,6 +35,8 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/location-requests", locationRequestRoutes);
 
+// Moodle API endpoints
+app.use("/api/moodle", moodleRoutes);
 
 // Test route
 app.get("/", (req, res) => {
