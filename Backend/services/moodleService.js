@@ -65,7 +65,33 @@ async function getMoodleEnrolledUsers(courseId) {
     return users;
 }
 
+
+async function getMoodleActiveEnrolledUsers(courseId) {
+    const id = Number(courseId);
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+        throw new Error("Invalid Moodle course ID.");
+    }
+
+    const users = await callMoodle(
+        "core_enrol_get_enrolled_users",
+        {
+            courseid: String(id),
+            "options[0][name]": "onlyactive",
+            "options[0][value]": "1"
+        }
+    );
+
+    if (!Array.isArray(users)) {
+        throw new Error("Invalid Moodle active enrolment response.");
+    }
+
+    return users;
+}
+
+
 module.exports = {
     getMoodleCourses,
-    getMoodleEnrolledUsers
+    getMoodleEnrolledUsers,
+    getMoodleActiveEnrolledUsers
 };

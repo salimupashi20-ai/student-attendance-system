@@ -1,3 +1,4 @@
+
 const express = require("express");
 
 const router = express.Router();
@@ -11,12 +12,14 @@ const {
     getCourseAttendanceStats
 } = require("../controllers/attendanceController");
 
-const protect =
-    require("../middleware/authMiddleware");
+const protect = require("../middleware/authMiddleware");
 
 const authorizeRoles =
     require("../middleware/roleMiddleware");
 
+// New Moodle verification middleware
+const verifyMoodleEnrollment =
+    require("../middleware/verifyMoodleEnrollment");
 
 // =====================================
 // STUDENT ROUTES
@@ -26,6 +29,7 @@ router.post(
     "/scan",
     protect,
     authorizeRoles("student"),
+    verifyMoodleEnrollment,
     scanQRCode
 );
 
@@ -42,7 +46,6 @@ router.get(
     authorizeRoles("student"),
     getMyAttendanceSummary
 );
-
 
 // =====================================
 // LECTURER ROUTES
@@ -68,6 +71,5 @@ router.get(
     authorizeRoles("lecturer"),
     getCourseAttendanceStats
 );
-
 
 module.exports = router;
