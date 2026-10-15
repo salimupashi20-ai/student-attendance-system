@@ -1,3 +1,4 @@
+
 const db = require("../config/db");
 const QRCode = require("qrcode");
 const crypto = require("crypto");
@@ -7,17 +8,39 @@ const crypto = require("crypto");
 // ========================================
 
 const buildQrCode = async (sessionId, qrToken) => {
-    const frontendUrl = process.env.FRONTEND_URL.replace(/\/$/, "");
+    const frontendUrl =
+        process.env.FRONTEND_URL.replace(/\/$/, "");
 
     const qrPayload =
         `${frontendUrl}/student/scan?session_id=${sessionId}&token=${qrToken}`;
 
-    return await QRCode.toDataURL(qrPayload);
+    return QRCode.toDataURL(qrPayload);
 };
 
+// ========================================
+// VALIDATE GPS COORDINATES
+// ========================================
+
+const validCoordinate = (value, minimum, maximum) => {
+    if (
+        value === null ||
+        value === undefined ||
+        (typeof value === "string" && value.trim() === "")
+    ) {
+        return false;
+    }
+
+    const number = Number(value);
+
+    return (
+        Number.isFinite(number) &&
+        number >= minimum &&
+        number <= maximum
+    );
+};
 
 // ========================================
-// CREATE SESSION
+// CREATE ATTENDANCE SESSION
 // ========================================
 
 const createSession = async (req, res) => {
@@ -27,13 +50,18 @@ const createSession = async (req, res) => {
             session_date,
             start_time,
             end_time,
+            classroom_id,
             lecturer_latitude,
             lecturer_longitude
         } = req.body;
 
+        // Existing frontend requests do not yet send
+        // a location_method, so GPS remains the default.
+        const locationMethod =
+            req.body.location_method ?? "live_gps";
+
         const lecturerId = req.user.id;
 
-        // Basic validation
         if (
             !course_id ||
             !session_date ||
@@ -46,249 +74,339 @@ const createSession = async (req, res) => {
             });
         }
 
-        // Confirm lecturer owns the course
-        const courseQuery = `
-            SELECT *
+        if (
+            !["classroom", "live_gps"].includes(locationMethod)
+        ) {
+            return res.status(400).json({
+                message: "Invalid location method."
+            });
+        }
+
+        // Lecturer must own the course.
+        const [courses] = await db.promise().execute(
+            `
+            SELECT id
             FROM courses
             WHERE id = ?
-            AND lecturer_id = ?
-        `;
-
-        db.query(
-            courseQuery,
-            [course_id, lecturerId],
-            async (err, courseResults) => {
-                if (err) {
-                    return res.status(500).json({
-                        error: err.message
-                    });
-                }
-
-                if (courseResults.length === 0) {
-                    return res.status(403).json({
-                        message:
-                            "You are not authorized to create a session for this course."
-                    });
-                }
-
-                // ----------------------------------------
-                // Prevent multiple active QR sessions
-                // ----------------------------------------
-
-                const activeQuery = `
-                    SELECT id
-                    FROM lecture_sessions
-                    WHERE created_by = ?
-                    AND is_active = 1
-                    AND qr_expires_at > NOW()
-                    ORDER BY created_at DESC
-                    LIMIT 1
-                `;
-
-                db.query(
-                    activeQuery,
-                    [lecturerId],
-                    async (activeErr, activeResults) => {
-                        if (activeErr) {
-                            return res.status(500).json({
-                                error: activeErr.message
-                            });
-                        }
-
-                        if (activeResults.length > 0) {
-                            return res.status(409).json({
-                                message:
-                                    "You already have an active attendance session. Close it or wait for the QR code to expire before starting another one."
-                            });
-                        }
-
-                        // Generate secure QR token
-                        const qrToken = crypto
-                            .randomBytes(32)
-                            .toString("hex");
-
-                        // QR expires 15 minutes after creation
-                        const expiryDate = new Date(
-                            Date.now() + 15 * 60 * 1000
-                        );
-
-                        const insertQuery = `
-                            INSERT INTO lecture_sessions
-                            (
-                                course_id,
-                                session_date,
-                                start_time,
-                                end_time,
-                                qr_token,
-                                qr_expires_at,
-                                lecturer_latitude,
-                                lecturer_longitude,
-                                allowed_radius,
-                                is_active,
-                                created_by
-                            )
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        `;
-
-                        db.query(
-                            insertQuery,
-                            [
-                                course_id,
-                                session_date,
-                                start_time,
-                                end_time,
-                                qrToken,
-                                expiryDate,
-                                lecturer_latitude ?? null,
-                                lecturer_longitude ?? null,
-                                50,
-                                true,
-                                lecturerId
-                            ],
-                            async (err, result) => {
-                                if (err) {
-                                    return res.status(500).json({
-                                        error: err.message
-                                    });
-                                }
-
-                                try {
-                                    const sessionId =
-                                        result.insertId;
-
-                                    const qrCode =
-                                        await buildQrCode(
-                                            sessionId,
-                                            qrToken
-                                        );
-
-                                    return res.status(201).json({
-                                        message:
-                                            "Lecture session created successfully",
-
-                                        session: {
-                                            id: sessionId,
-                                            course_id,
-                                            session_date,
-                                            start_time,
-                                            end_time,
-                                            qr_expires_at:
-                                                expiryDate,
-                                            allowed_radius: 50
-                                        },
-
-                                        qr_code: qrCode
-                                    });
-
-                                } catch (qrError) {
-                                    return res.status(500).json({
-                                        message:
-                                            "Session created, but QR generation failed.",
-                                        error:
-                                            qrError.message
-                                    });
-                                }
-                            }
-                        );
-                    }
-                );
-            }
+              AND lecturer_id = ?
+            LIMIT 1
+            `,
+            [course_id, lecturerId]
         );
 
+        if (courses.length === 0) {
+            return res.status(403).json({
+                message:
+                    "You are not authorized to create a session for this course."
+            });
+        }
+
+        let latitude;
+        let longitude;
+        let selectedClassroomId = null;
+        let allowedRadius = 50;
+        let locationSource;
+
+        // ====================================
+        // OPTION 1: REGISTERED CLASSROOM
+        // ====================================
+
+        if (locationMethod === "classroom") {
+            const numericClassroomId = Number(classroom_id);
+
+            if (
+                !Number.isSafeInteger(numericClassroomId) ||
+                numericClassroomId <= 0
+            ) {
+                return res.status(400).json({
+                    message: "Select a valid classroom."
+                });
+            }
+
+            const [classrooms] = await db.promise().execute(
+                `
+                SELECT
+                    id,
+                    building_name,
+                    room_name,
+                    latitude,
+                    longitude,
+                    allowed_radius
+                FROM classrooms
+                WHERE id = ?
+                  AND is_active = 1
+                LIMIT 1
+                `,
+                [numericClassroomId]
+            );
+
+            if (classrooms.length === 0) {
+                return res.status(404).json({
+                    message:
+                        "Classroom not found or is inactive."
+                });
+            }
+
+            const classroom = classrooms[0];
+
+            // Always use trusted database coordinates,
+            // never coordinates supplied by the lecturer
+            // for registered-classroom sessions.
+            latitude = Number(classroom.latitude);
+            longitude = Number(classroom.longitude);
+
+            selectedClassroomId = classroom.id;
+
+            // Preserve our original maximum radius
+            // of 50 metres. Smaller approved radii work.
+            allowedRadius = Math.min(
+                50,
+                Number(classroom.allowed_radius)
+            );
+
+            locationSource =
+                `${classroom.building_name} - ${classroom.room_name}`;
+        }
+
+        // ====================================
+        // OPTION 2: CURRENT LECTURER GPS
+        // ====================================
+
+        if (locationMethod === "live_gps") {
+            if (
+                !validCoordinate(
+                    lecturer_latitude,
+                    -90,
+                    90
+                ) ||
+                !validCoordinate(
+                    lecturer_longitude,
+                    -180,
+                    180
+                )
+            ) {
+                return res.status(400).json({
+                    message:
+                        "A valid lecturer GPS location is required."
+                });
+            }
+
+            latitude = Number(lecturer_latitude);
+            longitude = Number(lecturer_longitude);
+
+            locationSource = "Lecturer GPS Location";
+        }
+
+        // ====================================
+        // PREVENT MULTIPLE ACTIVE QR SESSIONS
+        // ====================================
+
+        const [activeSessions] = await db.promise().execute(
+            `
+            SELECT id
+            FROM lecture_sessions
+            WHERE created_by = ?
+              AND is_active = 1
+              AND qr_expires_at > NOW()
+            ORDER BY created_at DESC
+            LIMIT 1
+            `,
+            [lecturerId]
+        );
+
+        if (activeSessions.length > 0) {
+            return res.status(409).json({
+                message:
+                    "You already have an active attendance session. Close it or wait for the QR code to expire before starting another one."
+            });
+        }
+
+        // ====================================
+        // GENERATE SECURE QR TOKEN
+        // ====================================
+
+        const qrToken = crypto
+            .randomBytes(32)
+            .toString("hex");
+
+        const expiryDate = new Date(
+            Date.now() + 15 * 60 * 1000
+        );
+
+        // ====================================
+        // SAVE ATTENDANCE SESSION
+        // ====================================
+
+        const [result] = await db.promise().execute(
+            `
+            INSERT INTO lecture_sessions (
+                course_id,
+                session_date,
+                start_time,
+                end_time,
+                qr_token,
+                qr_expires_at,
+                lecturer_latitude,
+                lecturer_longitude,
+                allowed_radius,
+                classroom_id,
+                is_active,
+                created_by
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `,
+            [
+                course_id,
+                session_date,
+                start_time,
+                end_time,
+                qrToken,
+                expiryDate,
+                latitude,
+                longitude,
+                allowedRadius,
+                selectedClassroomId,
+                1,
+                lecturerId
+            ]
+        );
+
+        const sessionId = result.insertId;
+
+        let qrCode;
+
+        try {
+            qrCode = await buildQrCode(
+                sessionId,
+                qrToken
+            );
+        } catch (error) {
+            console.error("QR generation failed:", error);
+
+            return res.status(500).json({
+                message:
+                    "Session created, but QR generation failed."
+            });
+        }
+
+        return res.status(201).json({
+            message: "Lecture session created successfully",
+
+            session: {
+                id: sessionId,
+                course_id,
+                session_date,
+                start_time,
+                end_time,
+                qr_expires_at: expiryDate,
+                allowed_radius: allowedRadius,
+                classroom_id: selectedClassroomId,
+                location_method: locationMethod,
+                location_source: locationSource
+            },
+
+            qr_code: qrCode
+        });
+
     } catch (error) {
+        console.error("Session creation failed:", error);
+
         return res.status(500).json({
-            error: error.message
+            message: "Unable to create attendance session."
         });
     }
 };
-
 
 // ========================================
 // GET CURRENT ACTIVE SESSION
 // ========================================
 
-const getActiveSession = (req, res) => {
-    const lecturerId = req.user.id;
+const getActiveSession = async (req, res) => {
+    try {
+        const lecturerId = req.user.id;
 
-    const query = `
-        SELECT
-            lecture_sessions.id,
-            lecture_sessions.course_id,
-            courses.course_code,
-            courses.course_name,
-            lecture_sessions.session_date,
-            lecture_sessions.start_time,
-            lecture_sessions.end_time,
-            lecture_sessions.qr_token,
-            lecture_sessions.qr_expires_at,
-            lecture_sessions.allowed_radius,
-            lecture_sessions.lecturer_latitude,
-            lecture_sessions.lecturer_longitude,
-            lecture_sessions.is_active,
-            lecture_sessions.created_at
-        FROM lecture_sessions
-        INNER JOIN courses
-            ON lecture_sessions.course_id = courses.id
-        WHERE lecture_sessions.created_by = ?
-        AND lecture_sessions.is_active = 1
-        AND lecture_sessions.qr_expires_at > NOW()
-        ORDER BY lecture_sessions.created_at DESC
-        LIMIT 1
-    `;
+        const [results] = await db.promise().execute(
+            `
+            SELECT
+                ls.id,
+                ls.course_id,
+                c.course_code,
+                c.course_name,
+                ls.session_date,
+                ls.start_time,
+                ls.end_time,
+                ls.qr_token,
+                ls.qr_expires_at,
+                ls.allowed_radius,
+                ls.lecturer_latitude,
+                ls.lecturer_longitude,
+                ls.classroom_id,
+                ls.is_active,
+                ls.created_at,
+                cl.building_name,
+                cl.room_name
+            FROM lecture_sessions ls
+            INNER JOIN courses c
+                ON ls.course_id = c.id
+            LEFT JOIN classrooms cl
+                ON ls.classroom_id = cl.id
+            WHERE ls.created_by = ?
+              AND ls.is_active = 1
+              AND ls.qr_expires_at > NOW()
+            ORDER BY ls.created_at DESC
+            LIMIT 1
+            `,
+            [lecturerId]
+        );
 
-    db.query(
-        query,
-        [lecturerId],
-        async (err, results) => {
-            if (err) {
-                return res.status(500).json({
-                    error: err.message
-                });
-            }
-
-            if (results.length === 0) {
-                return res.status(200).json({
-                    message:
-                        "No active attendance session found.",
-                    activeSession: null
-                });
-            }
-
-            try {
-                const session = results[0];
-
-                const qrCode =
-                    await buildQrCode(
-                        session.id,
-                        session.qr_token
-                    );
-
-                // Never expose token separately to frontend
-                delete session.qr_token;
-
-                return res.status(200).json({
-                    message:
-                        "Active attendance session retrieved successfully.",
-
-                    activeSession: {
-                        ...session,
-                        qr_code: qrCode,
-                        location_source:
-                            "Saved Lecturer Location"
-                    }
-                });
-
-            } catch (qrError) {
-                return res.status(500).json({
-                    message:
-                        "Active session found, but QR generation failed.",
-                    error: qrError.message
-                });
-            }
+        if (results.length === 0) {
+            return res.status(200).json({
+                message: "No active attendance session found.",
+                activeSession: null
+            });
         }
-    );
-};
 
+        const session = results[0];
+
+        const qrCode = await buildQrCode(
+            session.id,
+            session.qr_token
+        );
+
+        // Do not expose the raw token separately.
+        delete session.qr_token;
+
+        const isClassroomSession =
+            session.classroom_id !== null;
+
+        return res.status(200).json({
+            message:
+                "Active attendance session retrieved successfully.",
+
+            activeSession: {
+                ...session,
+                qr_code: qrCode,
+
+                location_method:
+                    isClassroomSession
+                        ? "classroom"
+                        : "live_gps",
+
+                location_source:
+                    isClassroomSession
+                        ? `${session.building_name} - ${session.room_name}`
+                        : "Lecturer GPS Location"
+            }
+        });
+
+    } catch (error) {
+        console.error("Active session lookup failed:", error);
+
+        return res.status(500).json({
+            message: "Unable to retrieve active session."
+        });
+    }
+};
 
 // ========================================
 // GET LECTURER SESSIONS
@@ -328,14 +446,12 @@ const getMySessions = (req, res) => {
             }
 
             return res.status(200).json({
-                message:
-                    "Lecture sessions retrieved successfully.",
+                message: "Lecture sessions retrieved successfully.",
                 sessions: results
             });
         }
     );
 };
-
 
 // ========================================
 // CLOSE SESSION
@@ -349,7 +465,7 @@ const closeSession = (req, res) => {
         SELECT *
         FROM lecture_sessions
         WHERE id = ?
-        AND created_by = ?
+          AND created_by = ?
     `;
 
     db.query(
@@ -371,24 +487,22 @@ const closeSession = (req, res) => {
 
             if (!results[0].is_active) {
                 return res.status(400).json({
-                    message:
-                        "Session is already closed."
+                    message: "Session is already closed."
                 });
             }
 
-            const updateQuery = `
+            db.query(
+                `
                 UPDATE lecture_sessions
                 SET is_active = 0
                 WHERE id = ?
-            `;
-
-            db.query(
-                updateQuery,
-                [sessionId],
-                (err) => {
-                    if (err) {
+                  AND created_by = ?
+                `,
+                [sessionId, lecturerId],
+                (updateError) => {
+                    if (updateError) {
                         return res.status(500).json({
-                            error: err.message
+                            error: updateError.message
                         });
                     }
 
@@ -401,7 +515,6 @@ const closeSession = (req, res) => {
         }
     );
 };
-
 
 module.exports = {
     createSession,

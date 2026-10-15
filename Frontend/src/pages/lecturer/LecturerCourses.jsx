@@ -7,6 +7,8 @@ import {
 import axios from "axios";
 import "../../styles/dashboard.css";
 
+import ClassroomAttendanceStarter from "./ClassroomAttendanceStarter";
+
 function LecturerCourses() {
   const token =
     localStorage.getItem("token");
@@ -1939,6 +1941,35 @@ function LecturerCourses() {
       )}
 
 
+<ClassroomAttendanceStarter
+  courses={courses}
+  hasActiveSession={Boolean(serverActiveSession)}
+  onSessionCreated={async (data, course) => {
+    // Clear any old mobile-location setup UI.
+    handleCancelMobileSetup();
+
+    const session = {
+      ...data.session,
+      qr_code: data.qr_code,
+      course_code: course?.course_code,
+      course_name: course?.course_name
+    };
+
+    setActiveSession(session);
+    setServerActiveSession(session);
+
+    localStorage.setItem(
+      "lecturerActiveSession",
+      JSON.stringify(session)
+    );
+
+    setMessage(
+      "Classroom attendance QR is ready for students."
+    );
+  }}
+/>
+
+
       {/* COURSE COUNT */}
 
       <section className="stats-grid">
@@ -2086,7 +2117,7 @@ function LecturerCourses() {
                             ? "Checking Location..."
                             : serverActiveSession
                               ? "Session Already Active"
-                              : "Start Attendance"}
+                              : "Start with Current GPS"}
 
                         </button>
 

@@ -1,3 +1,4 @@
+
 import {
   BrowserRouter,
   Navigate,
@@ -6,140 +7,64 @@ import {
 } from "react-router-dom";
 
 import Login from "./pages/Login";
-
 import StudentScan from "./pages/StudentScan";
+import LecturerMobileLocation from "./pages/LecturerMobileLocation";
+import ProtectedRoute from "./components/ProtectedRoute";
 
-import LecturerMobileLocation
-  from "./pages/LecturerMobileLocation";
-
-import ProtectedRoute
-  from "./components/ProtectedRoute";
-
-// =========================
 // ADMIN
-// =========================
+import AdminLayout from "./layouts/AdminLayout";
+import AdminOverview from "./pages/admin/AdminOverview";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminCourses from "./pages/admin/AdminCourses";
+import AdminClassrooms from "./pages/admin/AdminClassrooms";
+import AdminEnrollments from "./pages/admin/AdminEnrollments";
+import AdminAttendance from "./pages/admin/AdminAttendance";
 
-import AdminLayout
-  from "./layouts/AdminLayout";
-
-import AdminOverview
-  from "./pages/admin/AdminOverview";
-
-import AdminUsers
-  from "./pages/admin/AdminUsers";
-
-import AdminCourses
-  from "./pages/admin/AdminCourses";
-
-import AdminEnrollments
-  from "./pages/admin/AdminEnrollments";
-
-import AdminAttendance
-  from "./pages/admin/AdminAttendance";
-
-// =========================
 // LECTURER
-// =========================
+import LecturerLayout from "./layouts/LecturerLayout";
+import LecturerOverview from "./pages/lecturer/LecturerOverview";
+import LecturerCourses from "./pages/lecturer/LecturerCourses";
+import LecturerSessions from "./pages/lecturer/LecturerSessions";
+import LecturerAnalytics from "./pages/lecturer/LecturerAnalytics";
 
-import LecturerLayout
-  from "./layouts/LecturerLayout";
-
-import LecturerOverview
-  from "./pages/lecturer/LecturerOverview";
-
-import LecturerCourses
-  from "./pages/lecturer/LecturerCourses";
-
-import LecturerSessions
-  from "./pages/lecturer/LecturerSessions";
-
-import LecturerAnalytics
-  from "./pages/lecturer/LecturerAnalytics";
-
-// =========================
 // STUDENT
-// =========================
-
-import StudentLayout
-  from "./layouts/StudentLayout";
-
-import StudentOverview
-  from "./pages/student/StudentOverview";
-
-import StudentCourses
-  from "./pages/student/StudentCourses";
-
-import StudentAttendance
-  from "./pages/student/StudentAttendance";
+import StudentLayout from "./layouts/StudentLayout";
+import StudentOverview from "./pages/student/StudentOverview";
+import StudentCourses from "./pages/student/StudentCourses";
+import StudentAttendance from "./pages/student/StudentAttendance";
 
 function App() {
   return (
     <BrowserRouter>
-
       <Routes>
 
-        {/* =========================
-            DEFAULT
-        ========================= */}
-
+        {/* DEFAULT ROUTE */}
         <Route
           path="/"
-          element={
-            <Navigate
-              to="/login"
-              replace
-            />
-          }
+          element={<Navigate to="/login" replace />}
         />
 
-
-        {/* =========================
-            LOGIN
-        ========================= */}
-
+        {/* LOGIN */}
         <Route
           path="/login"
           element={<Login />}
         />
 
-
-        {/* =========================
-            PUBLIC LECTURER
-            MOBILE LOCATION PAGE
-
-            This is intentionally not
-            behind ProtectedRoute.
-
-            Security is provided by the
-            random, short-lived setup
-            token in the QR URL.
-        ========================= */}
-
+        {/* PUBLIC LECTURER MOBILE LOCATION PAGE */}
         <Route
           path="/lecturer/mobile-location"
-          element={
-            <LecturerMobileLocation />
-          }
+          element={<LecturerMobileLocation />}
         />
 
-
-        {/* =========================
-            STUDENT
-        ========================= */}
-
+        {/* STUDENT ROUTES */}
         <Route
           path="/student"
           element={
-            <ProtectedRoute
-              allowedRoles={[
-                "student"
-              ]}
-            >
+            <ProtectedRoute allowedRoles={["student"]}>
               <StudentLayout />
             </ProtectedRoute>
           }
         >
-
           <Route
             index
             element={
@@ -152,61 +77,39 @@ function App() {
 
           <Route
             path="dashboard"
-            element={
-              <StudentOverview />
-            }
+            element={<StudentOverview />}
           />
 
           <Route
             path="courses"
-            element={
-              <StudentCourses />
-            }
+            element={<StudentCourses />}
           />
 
           <Route
             path="attendance"
-            element={
-              <StudentAttendance />
-            }
+            element={<StudentAttendance />}
           />
-
         </Route>
 
-
         {/* STUDENT QR SCAN */}
-
         <Route
           path="/student/scan"
           element={
-            <ProtectedRoute
-              allowedRoles={[
-                "student"
-              ]}
-            >
+            <ProtectedRoute allowedRoles={["student"]}>
               <StudentScan />
             </ProtectedRoute>
           }
         />
 
-
-        {/* =========================
-            LECTURER
-        ========================= */}
-
+        {/* LECTURER ROUTES */}
         <Route
           path="/lecturer"
           element={
-            <ProtectedRoute
-              allowedRoles={[
-                "lecturer"
-              ]}
-            >
+            <ProtectedRoute allowedRoles={["lecturer"]}>
               <LecturerLayout />
             </ProtectedRoute>
           }
         >
-
           <Route
             index
             element={
@@ -219,52 +122,34 @@ function App() {
 
           <Route
             path="dashboard"
-            element={
-              <LecturerOverview />
-            }
+            element={<LecturerOverview />}
           />
 
           <Route
             path="courses"
-            element={
-              <LecturerCourses />
-            }
+            element={<LecturerCourses />}
           />
 
           <Route
             path="sessions"
-            element={
-              <LecturerSessions />
-            }
+            element={<LecturerSessions />}
           />
 
           <Route
             path="analytics"
-            element={
-              <LecturerAnalytics />
-            }
+            element={<LecturerAnalytics />}
           />
-
         </Route>
 
-
-        {/* =========================
-            ADMIN
-        ========================= */}
-
+        {/* ADMIN ROUTES */}
         <Route
           path="/admin"
           element={
-            <ProtectedRoute
-              allowedRoles={[
-                "admin"
-              ]}
-            >
+            <ProtectedRoute allowedRoles={["admin"]}>
               <AdminLayout />
             </ProtectedRoute>
           }
         >
-
           <Route
             index
             element={
@@ -277,58 +162,42 @@ function App() {
 
           <Route
             path="dashboard"
-            element={
-              <AdminOverview />
-            }
+            element={<AdminOverview />}
           />
 
           <Route
             path="users"
-            element={
-              <AdminUsers />
-            }
+            element={<AdminUsers />}
           />
 
           <Route
             path="courses"
-            element={
-              <AdminCourses />
-            }
+            element={<AdminCourses />}
+          />
+
+          <Route
+            path="classrooms"
+            element={<AdminClassrooms />}
           />
 
           <Route
             path="enrollments"
-            element={
-              <AdminEnrollments />
-            }
+            element={<AdminEnrollments />}
           />
 
           <Route
             path="attendance"
-            element={
-              <AdminAttendance />
-            }
+            element={<AdminAttendance />}
           />
-
         </Route>
 
-
-        {/* =========================
-            FALLBACK
-        ========================= */}
-
+        {/* FALLBACK */}
         <Route
           path="*"
-          element={
-            <Navigate
-              to="/login"
-              replace
-            />
-          }
+          element={<Navigate to="/login" replace />}
         />
 
       </Routes>
-
     </BrowserRouter>
   );
 }
