@@ -1,6 +1,12 @@
 FROM brandkern/moodle:4.5-latest
 USER root
-# The upstream image can enable multiple Apache MPMs, which prevents startup.
-RUN a2dismod -f mpm_event mpm_worker || true
-RUN a2enmod mpm_prefork
+
+# Record the upstream Apache MPM configuration to identify a startup conflict.
+RUN echo '=== ENABLED MPM MODULES ===' && \
+    ls -la /etc/apache2/mods-enabled/*mpm* || true
+RUN echo '=== ALL APACHE MPM LoadModule DIRECTIVES ===' && \
+    grep -RnE '^[[:space:]]*LoadModule[[:space:]]+mpm_' /etc/apache2 2>/dev/null || true
+RUN echo '=== APACHE CONFIG TEST ===' && \
+    apache2ctl -t || true
+
 EXPOSE 80
