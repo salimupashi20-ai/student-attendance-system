@@ -1,0 +1,124 @@
+@startuml
+title Student Attendance System - Domain UML Class Diagram
+hide methods
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam linetype ortho
+
+class User <<entity>> {
+  id : Identifier
+  full_name : String
+  student_number : String [0..1]
+  staff_id : String [0..1]
+  password : PasswordHash
+  role : UserRole
+  created_at : DateTime
+}
+
+enum UserRole {
+  admin
+  lecturer
+  student
+}
+
+class Course <<entity>> {
+  id : Identifier
+  course_code : String
+  course_name : String
+  lecturer_id : Identifier
+  created_at : DateTime
+}
+
+class CourseEnrollment <<entity>> {
+  id : Identifier
+  student_id : Identifier
+  course_id : Identifier
+  enrolled_at : DateTime
+}
+
+class LectureSession <<entity>> {
+  id : Identifier
+  course_id : Identifier
+  session_date : Date
+  start_time : Time
+  end_time : Time
+  qr_token : String
+  qr_expires_at : DateTime
+  lecturer_latitude : Decimal [0..1]
+  lecturer_longitude : Decimal [0..1]
+  allowed_radius : Decimal
+  is_active : Boolean
+  created_by : Identifier
+  created_at : DateTime
+}
+
+class Attendance <<entity>> {
+  id : Identifier
+  student_id : Identifier
+  session_id : Identifier
+  student_latitude : Decimal
+  student_longitude : Decimal
+  distance_from_lecturer : Decimal
+  status : String
+  scan_time : DateTime
+}
+
+class LecturerLocationRequest <<entity>> {
+  id : Identifier
+  lecturer_id : Identifier
+  course_id : Identifier
+  session_date : Date
+  start_time : Time
+  end_time : Time
+  request_token : String
+  expires_at : DateTime
+  status : LocationRequestStatus
+  latitude : Decimal [0..1]
+  longitude : Decimal [0..1]
+  accuracy : Decimal [0..1]
+}
+
+enum LocationRequestStatus {
+  pending
+  completed
+  expired
+  used
+}
+
+User "1" -- "0..*" Course : teaches (lecturer)
+User "1" -- "0..*" CourseEnrollment : enrolls (student)
+Course "1" -- "0..*" CourseEnrollment : has enrollments
+Course "1" -- "0..*" LectureSession : has sessions
+User "1" -- "0..*" LectureSession : creates (lecturer)
+User "1" -- "0..*" Attendance : records (student)
+LectureSession "1" -- "0..*" Attendance : has attendance
+User "1" -- "0..*" LecturerLocationRequest : requests (lecturer)
+Course "1" -- "0..*" LecturerLocationRequest : prepares location for
+User ..> UserRole
+LecturerLocationRequest ..> LocationRequestStatus
+
+note top of User
+One users table represents all three roles.
+Student, lecturer and administrator are roles,
+not implemented subclasses.
+end note
+note bottom of Attendance
+Controller rules: student enrolled_at <= session created_at;
+reject a second attendance submission for the same session;
+require active, unexpired QR token and distance within radius.
+Successful scan writes status = present.
+end note
+note bottom of LecturerLocationRequest
+Mobile request expires after 5 minutes.
+Frontend copies completed coordinates into session creation,
+then marks the request used through a separate API call.
+There is no stored session/request foreign key in these queries.
+end note
+
+legend bottom
+  Conceptual domain model inferred from controller SQL, not an ORM model.
+  Types and multiplicities describe application relationships, not verified SQL DDL.
+  [0..1] denotes an optional value. No schema or migrations are supplied.
+  No database foreign-key, uniqueness or transaction guarantees are implied.
+endlegend
+@enduml

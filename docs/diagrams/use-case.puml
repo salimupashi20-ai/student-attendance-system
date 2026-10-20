@@ -1,0 +1,72 @@
+@startuml
+title Student Attendance System - Use Case Diagram
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+actor "Account holder" as Account
+actor Administrator as Admin
+actor Lecturer
+actor Student
+actor "Unauthenticated API client" as Guest
+
+Account <|-- Admin
+Account <|-- Lecturer
+Account <|-- Student
+
+rectangle "Student Attendance System" {
+  usecase "Log in" as Login
+  usecase "Register account\n(API only)" as Register
+  usecase "Create users" as Users
+  usecase "Manage courses and\nlecturer assignments" as AdminCourses
+  usecase "Manage enrollments" as AdminEnrollments
+  usecase "Review system-wide and\nsession attendance reports" as AdminReports
+  usecase "Create / view own courses" as LecturerCourses
+  usecase "Enroll students and\nview course roster" as LecturerEnrollments
+  usecase "Create attendance session\nand display QR code" as CreateSession
+  usecase "Supply lecturer location" as LecturerLocation
+  usecase "Capture location using\nmobile setup QR" as MobileLocation
+  usecase "Restore active session\nand close session" as Sessions
+  usecase "Review session attendance\nand course statistics" as LecturerReports
+  usecase "View enrolled courses" as StudentCourses
+  usecase "Open QR link and\nmark attendance" as MarkAttendance
+  usecase "Acquire student location" as StudentLocation
+  usecase "Validate session, enrollment,\nduplicate attendance and distance" as Validate
+  usecase "View own attendance\nhistory and summary" as StudentReports
+}
+
+Account -- Login
+Guest -- Register
+Admin -- Users
+Admin -- AdminCourses
+Admin -- AdminEnrollments
+Admin -- AdminReports
+Lecturer -- LecturerCourses
+Lecturer -- LecturerEnrollments
+Lecturer -- CreateSession
+Lecturer -- MobileLocation
+Lecturer -- Sessions
+Lecturer -- LecturerReports
+Student -- StudentCourses
+Student -- MarkAttendance
+Student -- StudentReports
+
+CreateSession ..> LecturerLocation : <<include>>
+MobileLocation ..> LecturerLocation : <<extend>>\n[mobile setup selected]
+MarkAttendance ..> StudentLocation : <<include>>
+MarkAttendance ..> Validate : <<include>>
+
+note bottom of Login
+Protected API use cases require a valid JWT and the appropriate role.
+Login is a precondition, rather than a repeated included use case.
+end note
+note bottom of MobileLocation
+The phone submits a short-lived setup token, without a JWT.
+Creating the request and polling its status require lecturer authentication.
+Direct browser location capture is also available.
+end note
+note bottom of Register
+POST /api/auth/register is public in the current routes.
+The React interface has no registration page.
+end note
+@enduml

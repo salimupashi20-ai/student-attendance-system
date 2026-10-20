@@ -1,0 +1,74 @@
+@startuml
+title Student Attendance System - System Sequence Diagram
+hide footbox
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+actor Lecturer
+actor Student
+participant "Student Attendance System" as System
+
+note over Lecturer,System
+System boundary: React frontend + Express API + MySQL.
+Internal calls are intentionally hidden in this system sequence diagram.
+Successful login and database availability are assumed after authentication.
+end note
+
+Lecturer -> System: Log in (staff ID, password)
+System --> Lecturer: JWT (24 hours), lecturer profile and dashboard
+
+opt Lecturer chooses mobile location setup
+  Lecturer -> System: Request mobile setup (course, date, start/end time)
+  System --> Lecturer: Setup QR link with request ID and token (5-minute expiry)
+  Lecturer -> System: Open setup link on phone and submit location\n(request ID, token, latitude, longitude, accuracy)
+  System --> Lecturer: Location accepted; request completed
+  loop While desktop waits for the location
+    Lecturer -> System: Check location request status
+    System --> Lecturer: Status and submitted location when completed
+  end
+end
+
+Lecturer -> System: Create session (course, date, start/end time, lecturer location)
+alt Course not owned by lecturer or an active session already exists
+  System --> Lecturer: Reject creation (403 ownership / 409 active session)
+else Session created
+  System --> Lecturer: Session details and attendance QR link\n(random token, 15-minute expiry, 50-meter allowed radius)
+  opt Session used a completed mobile location request
+    Lecturer -> System: Mark mobile location request used
+    System --> Lecturer: Request marked used
+  end
+
+  Lecturer -> Student: Display attendance QR code
+  Student -> System: Open QR link (session ID, QR token)
+  opt Student is not signed in
+    System --> Student: Request login; preserve QR destination
+    Student -> System: Log in (student number, password)
+    System --> Student: JWT and student profile; return to QR page
+  end
+
+  Student -> System: Mark attendance and permit browser location access
+  alt Location unavailable, denied, or reported accuracy exceeds 50 meters
+    System --> Student: Explain location issue; no attendance submission
+  else Location acquired with acceptable reported accuracy
+    note over Student,System
+    Frontend submits session ID, QR token, latitude and longitude.
+    API authenticates the JWT and requires the student role.
+    end note
+    alt Session/token invalid, closed or expired; lecturer location missing
+      System --> Student: Reject attendance with session validation error
+    else Student was not enrolled when the session was created
+      System --> Student: Reject attendance (403)
+    else Attendance already recorded for this student and session
+      System --> Student: Reject duplicate attendance (400)
+    else Calculated distance exceeds session radius
+      System --> Student: Reject attendance (403), distance and allowed radius
+    else All checks pass
+      System --> Student: Attendance recorded (201), status present and distance
+    end
+  end
+
+  Lecturer -> System: Request session attendance and summary
+  System --> Lecturer: Attendance records and session statistics
+  Lecturer -> System: Close session
+  System --> Lecturer: Session closed; further attendance rejected
+end
+@enduml

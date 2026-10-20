@@ -12,7 +12,11 @@ A web application for managing university courses, lecture sessions, and student
 
 Attendance sessions use randomly generated QR tokens that expire after 15 minutes. The API checks session status, enrollment at the time the session was created, duplicate submissions, and the student's distance from the lecturer's recorded location. New sessions use an allowed radius of 50 meters. Lecturers can also capture their location through a mobile location request.
 
-## Technology
+## System design diagrams
+
+See the [system sequence diagram, use case diagram, and UML class diagram](docs/diagrams/README.md) for the system's interactions, user capabilities, and domain relationships. Each includes a rendered image and editable PlantUML source.
+
+## Technology stack
 
 - **Frontend:** React 19, React Router 7, Axios, and Vite 8.
 - **Backend:** Node.js, Express 5, JWT authentication, bcrypt password hashing, and QR code generation.
