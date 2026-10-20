@@ -1,0 +1,94 @@
+@startuml
+title Student Attendance System - Domain Model
+hide methods
+hide circle
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+
+class "User" as User <<entity>> {
+  full name
+  role: administrator / lecturer / student
+  student number or staff ID
+}
+class "Course" as Course <<entity>> {
+  course code
+  course name
+}
+class "Enrollment" as Enrollment <<entity>> {
+  enrollment date and time
+}
+class "Lecture Session" as Session <<entity>> {
+  session date and start/end time
+  active status
+  allowed attendance radius
+}
+class "Attendance Record" as Attendance <<entity>> {
+  scan date and time
+  attendance status
+  distance from lecturer
+}
+class "Mobile Location Request" as Request <<entity>> {
+  proposed session date and time
+  setup token and expiry
+  status: pending / completed / expired / used
+}
+class "Attendance QR" as QR <<value object>> {
+  session link and token
+  expiry
+}
+class "Geographic Location" as Location <<value object>> {
+  latitude
+  longitude
+  reported accuracy: optional
+}
+
+User "1" -- "0..*" Course : teaches {lecturer}
+User "1" -- "0..*" Enrollment : holds {student}
+Course "1" -- "0..*" Enrollment : receives
+Course "1" -- "0..*" Session : schedules
+User "1" -- "0..*" Session : creates {lecturer}
+User "1" -- "0..*" Attendance : submits {student}
+Session "1" -- "0..*" Attendance : records
+User "1" -- "0..*" Request : initiates {lecturer}
+Course "1" -- "0..*" Request : prepares attendance for
+Session "1" -- "1" QR : offers
+Session "1" --> "0..1" Location : lecturer position
+Attendance "1" --> "1" Location : student position
+Request "1" --> "0..1" Location : captured phone position
+
+note top of User
+Administrator, lecturer and student are user roles.
+Administrators manage users, courses and enrollments,
+and review attendance across the system.
+end note
+note bottom of Enrollment
+An enrollment connects one student to one course.
+The student must be enrolled by session creation time
+to submit attendance for that session.
+end note
+note bottom of Attendance
+One accepted submission per student per session.
+Requires an active session, valid unexpired QR token,
+lecturer position and student within the allowed radius.
+New sessions allow 50 meters; QR tokens last 15 minutes.
+end note
+note bottom of Request
+Optional mobile setup, with a 5-minute token lifetime.
+Completed coordinates are copied into session creation.
+The frontend then marks the request used.
+end note
+note bottom of Location
+A value describing a position, not a shared location entity.
+Each association represents a separate position value.
+The frontend checks student accuracy <= 50 meters;
+the API separately checks distance from the lecturer.
+end note
+
+legend bottom
+  Business concepts and intended multiplicities, inferred from the application.
+  QR and location are conceptual values, not additional database tables.
+  Session QR images are generated from the stored session token and frontend URL.
+  Credentials, database IDs, foreign-key fields and controller methods are omitted.
+  Database constraints cannot be verified without the missing schema/migrations.
+endlegend
+@enduml

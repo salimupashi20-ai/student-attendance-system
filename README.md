@@ -14,7 +14,7 @@ Attendance sessions use randomly generated QR tokens that expire after 15 minute
 
 ## System design diagrams
 
-See the [system sequence diagram, use case diagram, and UML class diagram](docs/diagrams/README.md) for the system's interactions, user capabilities, and domain relationships. Each includes a rendered image and editable PlantUML source.
+See the [system sequence diagram, use case diagram, UML class diagram, and domain model](docs/diagrams/README.md) for the system's interactions, user capabilities, and domain relationships. Each includes a rendered image and editable PlantUML source.
 
 ## Technology stack
 

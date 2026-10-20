@@ -26,6 +26,14 @@ Shows the domain entities, representative fields, role and request-status enumer
 
 [PlantUML source](class-diagram.puml)
 
+## Domain model diagram
+
+Shows the business concepts of users, courses, enrollments, lecture sessions, attendance records, mobile location requests, attendance QR values, and geographic positions. It focuses on relationships and business rules, omitting database identifiers, foreign-key fields, credentials, and implementation methods. User roles qualify the associations; they are not separate stored user subclasses. QR and location values are conceptual descriptions, not additional database tables. Multiplicities express intended application relationships rather than verified database constraints.
+
+![Domain model diagram](domain-model.svg)
+
+[PlantUML source](domain-model.puml)
+
 ## Implementation references
 
 - [Authentication and registration](../../Backend/controllers/authController.js), [JWT authentication](../../Backend/middleware/authMiddleware.js), and [role middleware](../../Backend/middleware/roleMiddleware.js).
